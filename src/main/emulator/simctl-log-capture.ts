@@ -30,7 +30,6 @@ export function captureSimulatorLog(
     let nextEntryIndex = 0
     let pending = ''
     let pendingBytes = 0
-    let discardingRecord = false
     let stderr = ''
     let settled = false
     let failure: Parameters<typeof mapSimctlError>[0] | undefined
@@ -59,28 +58,24 @@ export function captureSimulatorLog(
       while (offset < chunk.length) {
         const newline = chunk.indexOf('\n', offset)
         const end = newline === -1 ? chunk.length : newline
-        if (!discardingRecord) {
-          const fragment = chunk.slice(offset, end)
-          const fragmentBytes = Buffer.byteLength(fragment, 'utf8')
-          if (pendingBytes + fragmentBytes > SIMULATOR_LOG_RECORD_LIMIT) {
-            // Discard through the next newline so a record suffix cannot become a new entry.
-            pending = ''
-            pendingBytes = 0
-            discardingRecord = true
-          } else {
-            pending += fragment
-            pendingBytes += fragmentBytes
-          }
+        const fragment = chunk.slice(offset, end)
+        const fragmentBytes = Buffer.byteLength(fragment, 'utf8')
+        if (pendingBytes + fragmentBytes > SIMULATOR_LOG_RECORD_LIMIT) {
+          onError(
+            new Error(
+              'Simulator log record exceeds the 64 KiB limit; log capture stopped to avoid returning incomplete logs. Try a narrower filter or time window.'
+            )
+          )
+          return
         }
+        pending += fragment
+        pendingBytes += fragmentBytes
         if (newline === -1) {
           return
         }
-        if (!discardingRecord) {
-          appendEntry(pending)
-        }
+        appendEntry(pending)
         pending = ''
         pendingBytes = 0
-        discardingRecord = false
         offset = newline + 1
       }
     }

@@ -84,7 +84,7 @@ describe('captureSimulatorLog', () => {
     await expect(capture).resolves.toEqual([{ message: 'four' }, { message: '끝🙂' }])
   })
 
-  it('discards oversized records across chunks and resumes at the next newline', async () => {
+  it('rejects oversized records across chunks instead of returning an incomplete tail', async () => {
     const child = mockChild()
     spawnMock.mockReturnValue(child)
     const capture = captureSimulatorLog('device-1', { lines: 2 })
@@ -96,27 +96,44 @@ describe('captureSimulatorLog', () => {
     child.stdout.write('\n{"eventMessage":"after"}\n')
     child.emit('close', 0, null)
 
-    await expect(capture).resolves.toEqual([{ message: 'before' }, { message: 'after' }])
+    await expect(capture).rejects.toMatchObject({
+      code: 'emulator_error',
+      message: expect.stringContaining('log capture stopped to avoid returning incomplete logs')
+    })
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM')
   })
 
-  it('applies the byte limit to complete records and preserves the exact boundary', async () => {
+  it('preserves records at the exact byte limit', async () => {
     const child = mockChild()
     spawnMock.mockReturnValue(child)
     const capture = captureSimulatorLog('device-1')
     const overhead = Buffer.byteLength(JSON.stringify({ eventMessage: '' }))
     const boundaryMessage = 'x'.repeat(64 * 1024 - overhead)
     child.stdout.write(
-      `${JSON.stringify({ eventMessage: `${boundaryMessage}x` })}\n` +
-        `${JSON.stringify({ eventMessage: '한'.repeat(32 * 1024) })}\n` +
-        `${JSON.stringify({ eventMessage: boundaryMessage })}\n` +
-        '{"eventMessage":"after"}'
+      `${JSON.stringify({ eventMessage: boundaryMessage })}\n` + '{"eventMessage":"after"}'
     )
     child.emit('close', 0, null)
 
     await expect(capture).resolves.toEqual([{ message: boundaryMessage }, { message: 'after' }])
   })
 
-  it('does not parse a valid JSON suffix of an oversized unterminated record at close', async () => {
+  it.each(['x'.repeat(64 * 1024), '한'.repeat(32 * 1024)])(
+    'rejects a complete oversized record using UTF-8 bytes',
+    async (message) => {
+      const child = mockChild()
+      spawnMock.mockReturnValue(child)
+      const capture = captureSimulatorLog('device-1')
+      child.stdout.write(`${JSON.stringify({ eventMessage: message })}\n`)
+      child.emit('close', 0, null)
+
+      await expect(capture).rejects.toMatchObject({
+        code: 'emulator_error',
+        message: expect.stringContaining('exceeds the 64 KiB limit')
+      })
+    }
+  )
+
+  it('rejects an oversized unterminated record even when the process closes successfully', async () => {
     const child = mockChild()
     spawnMock.mockReturnValue(child)
     const capture = captureSimulatorLog('device-1')
@@ -124,6 +141,9 @@ describe('captureSimulatorLog', () => {
     child.stdout.write('{"eventMessage":"suffix must not be parsed"}')
     child.emit('close', 0, null)
 
-    await expect(capture).resolves.toEqual([])
+    await expect(capture).rejects.toMatchObject({
+      code: 'emulator_error',
+      message: expect.stringContaining('exceeds the 64 KiB limit')
+    })
   })
 })

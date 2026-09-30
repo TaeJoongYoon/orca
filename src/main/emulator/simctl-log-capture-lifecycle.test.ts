@@ -44,6 +44,22 @@ describe('simulator log capture failure lifecycle', () => {
   })
   afterEach(() => vi.useRealTimers())
 
+  it('bounds cleanup after a record overflow when the child ignores TERM', async () => {
+    const { child, result } = startCapture()
+    child.stdout.write('x'.repeat(64 * 1024 + 1))
+    expect(child.kill.mock.calls).toEqual([['SIGTERM']])
+    expect(child.stdout.listenerCount('data')).toBe(0)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(await result).toMatchObject({
+      code: 'emulator_error',
+      message: expect.stringContaining('exceeds the 64 KiB limit')
+    })
+    expect(child.kill.mock.calls).toEqual([['SIGTERM'], ['SIGKILL']])
+    expect(child.stdout.destroyed).toBe(true)
+    expect(child.stderr.destroyed).toBe(true)
+    expectClean(child)
+  })
+
   it('settles a silent timeout after TERM then KILL and releases listeners', async () => {
     const { child, result } = startCapture()
     await vi.advanceTimersByTimeAsync(20_000)
