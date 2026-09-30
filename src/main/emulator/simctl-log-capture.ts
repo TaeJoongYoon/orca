@@ -5,6 +5,7 @@ import { parseSimulatorLogLine, simctlLogShowArgs, type SimulatorLogEntry } from
 const SIMULATOR_LOG_TIMEOUT_MS = 20_000
 const SIMULATOR_LOG_EXIT_GRACE_MS = 2_000
 const SIMULATOR_LOG_STDERR_LIMIT = 64 * 1024
+const SIMULATOR_LOG_RECORD_LIMIT = 64 * 1024
 
 const ignoreLateError = (): void => {}
 
@@ -28,6 +29,8 @@ export function captureSimulatorLog(
     const lineLimit = options?.lines
     let nextEntryIndex = 0
     let pending = ''
+    let pendingBytes = 0
+    let discardingRecord = false
     let stderr = ''
     let settled = false
     let failure: Parameters<typeof mapSimctlError>[0] | undefined
@@ -52,11 +55,33 @@ export function captureSimulatorLog(
     }
 
     const onStdout = (chunk: string): void => {
-      pending += chunk
-      const lines = pending.split('\n')
-      pending = lines.pop() ?? ''
-      for (const line of lines) {
-        appendEntry(line)
+      let offset = 0
+      while (offset < chunk.length) {
+        const newline = chunk.indexOf('\n', offset)
+        const end = newline === -1 ? chunk.length : newline
+        if (!discardingRecord) {
+          const fragment = chunk.slice(offset, end)
+          const fragmentBytes = Buffer.byteLength(fragment, 'utf8')
+          if (pendingBytes + fragmentBytes > SIMULATOR_LOG_RECORD_LIMIT) {
+            // Discard through the next newline so a record suffix cannot become a new entry.
+            pending = ''
+            pendingBytes = 0
+            discardingRecord = true
+          } else {
+            pending += fragment
+            pendingBytes += fragmentBytes
+          }
+        }
+        if (newline === -1) {
+          return
+        }
+        if (!discardingRecord) {
+          appendEntry(pending)
+        }
+        pending = ''
+        pendingBytes = 0
+        discardingRecord = false
+        offset = newline + 1
       }
     }
     const onStderr = (chunk: string): void => {

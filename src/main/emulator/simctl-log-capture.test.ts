@@ -83,4 +83,47 @@ describe('captureSimulatorLog', () => {
     child.emit('close', 0, null)
     await expect(capture).resolves.toEqual([{ message: 'four' }, { message: '끝🙂' }])
   })
+
+  it('discards oversized records across chunks and resumes at the next newline', async () => {
+    const child = mockChild()
+    spawnMock.mockReturnValue(child)
+    const capture = captureSimulatorLog('device-1', { lines: 2 })
+    child.stdout.write('{"eventMessage":"before"}\n{"eventMessage":"')
+    for (let index = 0; index < 32; index++) {
+      child.stdout.write('x'.repeat(4096))
+    }
+    child.stdout.write('"}{"eventMessage":"suffix must not be parsed"}')
+    child.stdout.write('\n{"eventMessage":"after"}\n')
+    child.emit('close', 0, null)
+
+    await expect(capture).resolves.toEqual([{ message: 'before' }, { message: 'after' }])
+  })
+
+  it('applies the byte limit to complete records and preserves the exact boundary', async () => {
+    const child = mockChild()
+    spawnMock.mockReturnValue(child)
+    const capture = captureSimulatorLog('device-1')
+    const overhead = Buffer.byteLength(JSON.stringify({ eventMessage: '' }))
+    const boundaryMessage = 'x'.repeat(64 * 1024 - overhead)
+    child.stdout.write(
+      `${JSON.stringify({ eventMessage: `${boundaryMessage}x` })}\n` +
+        `${JSON.stringify({ eventMessage: '한'.repeat(32 * 1024) })}\n` +
+        `${JSON.stringify({ eventMessage: boundaryMessage })}\n` +
+        '{"eventMessage":"after"}'
+    )
+    child.emit('close', 0, null)
+
+    await expect(capture).resolves.toEqual([{ message: boundaryMessage }, { message: 'after' }])
+  })
+
+  it('does not parse a valid JSON suffix of an oversized unterminated record at close', async () => {
+    const child = mockChild()
+    spawnMock.mockReturnValue(child)
+    const capture = captureSimulatorLog('device-1')
+    child.stdout.write('x'.repeat(64 * 1024 + 1))
+    child.stdout.write('{"eventMessage":"suffix must not be parsed"}')
+    child.emit('close', 0, null)
+
+    await expect(capture).resolves.toEqual([])
+  })
 })
