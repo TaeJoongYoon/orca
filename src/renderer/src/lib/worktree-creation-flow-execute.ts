@@ -1,6 +1,5 @@
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
-import { preflightAgentTrust } from '@/lib/agent-trust-preflight'
 import { activateAndRevealWorktree, type ActivateAndRevealResult } from '@/lib/worktree-activation'
 import { ensureWorktreeHasInitialTerminal } from '@/lib/worktree-initial-terminal-seeding'
 import {
@@ -24,7 +23,6 @@ import {
   type WorktreeCreationStructuredSessionResult
 } from '@/lib/worktree-creation-structured-session'
 import { completeWorktreeCreation } from '@/lib/worktree-creation-completion'
-import { markStructuredWorktreeLaunchUnconfirmed } from '@/lib/worktree-creation-structured-recovery'
 import { ensureWebRuntimeWorktreeTerminalAfterWake } from '@/lib/web-runtime-worktree-terminal-after-wake'
 
 // Why: activePendingCreationId can outlive the terminal route when the user
@@ -143,23 +141,14 @@ export async function executeWorktreeCreation(
     // startup, so both halves of the handoff share one renderer-session token.
     preparedRequest.startupPlan.launchToken = createBrowserUuid()
   }
-  const fallbackStartupOpt = buildWorktreeCreationStartupOpt(preparedRequest, backendSpawned)
-  const startupOpt = structuredLaunch ? undefined : fallbackStartupOpt
-
-  if (worktree.path && !structuredLaunch) {
-    const repoConnectionId =
-      useAppStore.getState().repos.find((repo) => repo.id === worktree.repoId)?.connectionId ?? null
-    await preflightAgentTrust({
-      agent: preparedRequest.agent,
-      workspacePath: worktree.path,
-      connectionId: repoConnectionId
-    })
-  }
+  const startupOpt = structuredLaunch
+    ? undefined
+    : buildWorktreeCreationStartupOpt(preparedRequest, backendSpawned)
 
   // `createWorktree` already inserted the real worktree row. Leaving for an app
   // view keeps the create in the background, while selecting another workspace
   // means the user still expects this task-launch handoff when it becomes ready;
-  // the entry guard prevents a late trust preflight from reviving a cancelled create.
+  // the entry guard keeps a cancelled create from being revived.
   const completionState = useAppStore.getState()
   const shouldActivateOnCompletion =
     completionState.pendingWorktreeCreations[creationId] !== undefined &&
@@ -208,10 +197,8 @@ export async function executeWorktreeCreation(
             result.setup,
             preparedRequest.issueCommand,
             result.defaultTabs,
-            {
-              ...(preparedRequest.agent !== null ? { callerProvidesSurface: true } : {}),
-              ...(backendSpawned ? { backendStartupTerminalSpawned: true } : {})
-            }
+            // Activation failed before providing its promised surface, so recovery must seed one.
+            backendSpawned ? { backendStartupTerminalSpawned: true } : undefined
           )
         } catch (recoveryError) {
           console.error(
@@ -237,7 +224,7 @@ export async function executeWorktreeCreation(
       }
     }
   } else {
-    // Keep chat creation on its pending surface until the session is ready.
+    // Why: backgrounded creates still need explicit setup/issue terminals, but must not activate them.
     const hasExplicitTerminalWork = Boolean(
       startupOpt || result.setup || preparedRequest.issueCommand || result.defaultTabs
     )
@@ -275,9 +262,10 @@ export async function executeWorktreeCreation(
 
   let structuredLaunchAccepted = structuredLaunch
   const { agentLaunchRoute } = preparedRequest
+  const structuredAgent = preparedRequest.agent
   if (
     agentLaunchRoute === 'structured-native-chat' &&
-    isAgentSessionHandleProvider(preparedRequest.agent)
+    isAgentSessionHandleProvider(structuredAgent)
   ) {
     let structuredSession: WorktreeCreationStructuredSessionResult | null = null
     try {
@@ -287,7 +275,6 @@ export async function executeWorktreeCreation(
         agentLaunchRoute,
         worktreeId: worktree.id,
         shouldActivateOnCompletion,
-        fallbackStartupOpt,
         activation,
         primaryTabId
       })
@@ -301,10 +288,6 @@ export async function executeWorktreeCreation(
       activation = structuredSession.activation
       primaryTabId = structuredSession.primaryTabId
       if (structuredSession.cancelled) {
-        return
-      }
-      if (structuredSession.visibilityUnknown) {
-        markStructuredWorktreeLaunchUnconfirmed(creationId, worktree.id)
         return
       }
     }
