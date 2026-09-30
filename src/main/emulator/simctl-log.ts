@@ -81,7 +81,14 @@ export function parseSimulatorLogLine(line: string): SimulatorLogEntry | undefin
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
       return undefined
     }
-    raw = value as RawSimulatorLogEntry
+    raw = {
+      timestamp: 'timestamp' in value ? value.timestamp : undefined,
+      messageType: 'messageType' in value ? value.messageType : undefined,
+      subsystem: 'subsystem' in value ? value.subsystem : undefined,
+      category: 'category' in value ? value.category : undefined,
+      processImagePath: 'processImagePath' in value ? value.processImagePath : undefined,
+      eventMessage: 'eventMessage' in value ? value.eventMessage : undefined
+    }
   } catch {
     return undefined
   }

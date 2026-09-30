@@ -8,10 +8,12 @@ vi.mock('../../shared/child-process/run-process', () => ({ spawnProcess: spawnMo
 import { captureSimulatorLog } from './simctl-log-capture'
 
 function startCapture() {
-  const child = Object.assign(new EventEmitter(), {
-    pid: 123 as number | undefined,
-    exitCode: null as number | null,
-    signalCode: null as NodeJS.Signals | null,
+  const processState: {
+    pid: number | undefined
+    exitCode: number | null
+    signalCode: NodeJS.Signals | null
+  } = { pid: 123, exitCode: null, signalCode: null }
+  const child = Object.assign(new EventEmitter(), processState, {
     killed: false,
     stdout: new PassThrough(),
     stderr: new PassThrough(),
