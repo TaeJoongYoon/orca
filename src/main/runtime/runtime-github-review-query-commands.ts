@@ -1,7 +1,22 @@
+import { getRepoSshConnectionId } from '../../shared/execution-host'
+import { isFolderRepo } from '../../shared/repo-kind'
+import type {
+  ActionsRunsQuery,
+  ActionsWorkflowsQuery,
+  ActionsDetailsQuery
+} from '../../shared/github/actions-types'
 import type { GitHubOwnerRepo, GitHubPRFile } from '../../shared/github/pull-request-types'
 import type { Repo } from '../../shared/repo-types'
 import type { LocalProjectGhExecOptions } from '../project-runtime-git-options'
-import { getIssue, getPRCheckDetails, getPRChecks, getPRComments } from '../github/client'
+import {
+  getIssue,
+  getPRCheckDetails,
+  getPRChecks,
+  getPRComments,
+  listActionsRuns,
+  listActionsWorkflows,
+  getWorkflowRunDetails
+} from '../github/client'
 import { getPRFileContents } from '../github/work-item-details'
 
 type LocalGitArgs = [] | [LocalProjectGhExecOptions]
@@ -13,6 +28,52 @@ type RuntimeGitHubReviewQueryCommandsDeps = {
 
 export class RuntimeGitHubReviewQueryCommands {
   constructor(private readonly deps: RuntimeGitHubReviewQueryCommandsDeps) {}
+
+  private async resolveActionsRepo(selector: string): Promise<Repo> {
+    const repo = await this.deps.resolveRepo(selector)
+    if (isFolderRepo(repo)) {
+      throw new Error('Select a registered Git repository for Actions')
+    }
+    return repo
+  }
+  async getRepoActionsRuns(selector: string, args: ActionsRunsQuery, signal?: AbortSignal) {
+    const repo = await this.resolveActionsRepo(selector)
+    return listActionsRuns(
+      repo.path,
+      args,
+      getRepoSshConnectionId(repo),
+      this.deps.getLocalGitArgs(repo)[0],
+      signal
+    )
+  }
+  async getRepoActionsWorkflows(
+    selector: string,
+    args: ActionsWorkflowsQuery,
+    signal?: AbortSignal
+  ) {
+    const repo = await this.resolveActionsRepo(selector)
+    return listActionsWorkflows(
+      repo.path,
+      args,
+      getRepoSshConnectionId(repo),
+      this.deps.getLocalGitArgs(repo)[0],
+      signal
+    )
+  }
+  async getRepoActionsRunDetails(
+    selector: string,
+    args: ActionsDetailsQuery,
+    signal?: AbortSignal
+  ) {
+    const repo = await this.resolveActionsRepo(selector)
+    return getWorkflowRunDetails(
+      repo.path,
+      args,
+      getRepoSshConnectionId(repo),
+      this.deps.getLocalGitArgs(repo)[0],
+      signal
+    )
+  }
 
   async getRepoIssue(
     repoSelector: string,

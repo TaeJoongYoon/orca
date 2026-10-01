@@ -12,6 +12,7 @@ import {
   setPRCommentReaction
 } from '../github/client'
 import type { Store } from '../persistence'
+import { getRepoSshConnectionId } from '../../shared/execution-host'
 import {
   assertRegisteredGitHubRepo,
   getGitHubLocalGitOptionArgs,
@@ -19,15 +20,24 @@ import {
 } from './github-repo-routing'
 
 export function registerGitHubPRReadHandlers(store: Store): void {
-  ipcMain.handle('gh:repoSlug', (_event, args: { repoPath: string }) => {
-    const repo = assertRegisteredGitHubRepo(args, store)
-    const localGitOptions = getGitHubLocalGitOptionArgs(store, repo)[0]
-    return localGitOptions
-      ? getRepoSlug(repo.path, getGitHubRepoConnectionId(repo), {
-          localGitExecOptions: localGitOptions
+  ipcMain.handle(
+    'gh:repoSlug',
+    (_event, args: { repoPath: string; requireVerifiedSshProbe?: boolean }) => {
+      const repo = assertRegisteredGitHubRepo(args, store)
+      const localGitOptions = getGitHubLocalGitOptionArgs(store, repo)[0]
+      if (args.requireVerifiedSshProbe) {
+        return getRepoSlug(repo.path, getRepoSshConnectionId(repo), {
+          localGitExecOptions: localGitOptions,
+          requireVerifiedSshProbe: true
         })
-      : getRepoSlug(repo.path, getGitHubRepoConnectionId(repo))
-  })
+      }
+      return localGitOptions
+        ? getRepoSlug(repo.path, getGitHubRepoConnectionId(repo), {
+            localGitExecOptions: localGitOptions
+          })
+        : getRepoSlug(repo.path, getGitHubRepoConnectionId(repo))
+    }
+  )
 
   ipcMain.handle('gh:repoUpstream', (_event, args: { repoPath: string }) => {
     const repo = assertRegisteredGitHubRepo(args, store)

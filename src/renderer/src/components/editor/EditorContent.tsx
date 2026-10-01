@@ -1,3 +1,4 @@
+import { ActionsRunDetailsPanel } from './ActionsRunDetailsPanel'
 import { useAppStore } from '@/store'
 import type { MarkdownViewMode, OpenFile, PendingEditorReveal } from '@/store/slices/editor'
 import type { GitDiffResult } from '../../../../shared/git-diff-compare-types'
@@ -135,6 +136,9 @@ export function EditorContent({
           )}
         </div>
       )
+    }
+    if (checkRunDetails.actionsContext) {
+      return <ActionsRunDetailsPanel file={activeFile} />
     }
     const details = checkRunDetails.details
     return (

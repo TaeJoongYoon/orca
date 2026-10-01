@@ -1,3 +1,4 @@
+import { loadActionsDetailTab } from '@/store/github/actions-detail-tabs'
 import type { EditorGet, EditorSet } from '../types/editor-set-get'
 import type { EditorSlice } from '../types/editor-slice'
 import { translate } from '@/i18n/i18n'
@@ -28,6 +29,7 @@ export function createCheckRunDetailsActions(
       const id = buildCheckRunDetailsTabId(worktreeId, check)
       const label = getCheckRunDetailsTabLabel(check)
       const checkRunDetails: OpenCheckRunDetailsState = {
+        actionsContext: state.actionsContext,
         contextKey,
         check,
         requestId: state.requestId,
@@ -110,6 +112,7 @@ export function createCheckRunDetailsActions(
         const githubRepository = state.githubRepository ?? current.githubRepository ?? null
         const gitlabProjectRef = state.gitlabProjectRef ?? current.gitlabProjectRef ?? null
         const nextCheckRunDetails: OpenCheckRunDetailsState = {
+          actionsContext: state.actionsContext ?? current.actionsContext,
           contextKey,
           check,
           requestId: state.requestId ?? current.requestId,
@@ -145,6 +148,10 @@ export function createCheckRunDetailsActions(
       const file = state.openFiles.find((candidate) => candidate.id === fileId)
       const checkRunDetails = file?.checkRunDetails
       if (!file || file.mode !== 'check-details' || !checkRunDetails) {
+        return
+      }
+      if (checkRunDetails.actionsContext) {
+        await loadActionsDetailTab(get, fileId)
         return
       }
       const { contextKey, check } = checkRunDetails

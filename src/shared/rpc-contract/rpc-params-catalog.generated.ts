@@ -215,6 +215,7 @@ import {
   WorktreeSelector as WorktreeSelectorOfGitParams
 } from './git-params'
 import { BindableAccounts, ValidateAccountBinding } from './github-account-binding-params'
+import { ActionsRunDetails, ActionsRuns, ActionsWorkflows } from './github-actions-params'
 import { CreateIssue, Issue, IssueComment, UpdateIssue } from './github-issue-params'
 import {
   ClearProjectItemField,
@@ -259,6 +260,7 @@ import { RepoSelector, SlugRepo } from './github-repo-target-params'
 import {
   IssuesList,
   RateLimit,
+  RepoSlug,
   WorkItem,
   WorkItemByOwnerRepo,
   WorkItemsCount,
@@ -825,6 +827,9 @@ export const RPC_PARAMS_BY_METHOD = {
   'git.submoduleStatus': GitSubmoduleStatus,
   'git.unstage': GitFilePath,
   'git.upstreamStatus': GitTargetedRemote,
+  'github.actionsRunDetails': ActionsRunDetails,
+  'github.actionsRuns': ActionsRuns,
+  'github.actionsWorkflows': ActionsWorkflows,
   'github.addIssueComment': IssueComment,
   'github.addPRReviewComment': PRReviewComment,
   'github.addPRReviewCommentReply': PRReviewCommentReply,
@@ -861,7 +866,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'github.project.workItemDetailsBySlug': ProjectWorkItemDetailsBySlug,
   'github.rateLimit': RateLimit,
   'github.removePRReviewers': RemovePrReviewers,
-  'github.repoSlug': RepoSelector,
+  'github.repoSlug': RepoSlug,
   'github.repoUpstream': RepoSelector,
   'github.requestPRReviewers': RequestPrReviewers,
   'github.rerunPRChecks': RerunPullRequestChecks,

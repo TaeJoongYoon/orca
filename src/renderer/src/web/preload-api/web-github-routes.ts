@@ -1,4 +1,7 @@
 export type WebGitHubRouteKey =
+  | 'actionsRuns'
+  | 'actionsWorkflows'
+  | 'actionsRunDetails'
   | 'repoSlug'
   | 'repoUpstream'
   | 'prForBranch'
@@ -52,6 +55,9 @@ export type WebGitHubRouteKey =
   | 'updateIssueTypeBySlug'
 
 export type WebGitHubRuntimeMethod =
+  | 'github.actionsRuns'
+  | 'github.actionsWorkflows'
+  | 'github.actionsRunDetails'
   | 'github.repoSlug'
   | 'github.repoUpstream'
   | 'github.prForBranch'
@@ -105,6 +111,9 @@ export type WebGitHubRuntimeMethod =
   | 'github.project.updateIssueTypeBySlug'
 
 export const GITHUB_WEB_RPC_METHODS = {
+  actionsRuns: 'github.actionsRuns',
+  actionsWorkflows: 'github.actionsWorkflows',
+  actionsRunDetails: 'github.actionsRunDetails',
   repoSlug: 'github.repoSlug',
   repoUpstream: 'github.repoUpstream',
   prForBranch: 'github.prForBranch',

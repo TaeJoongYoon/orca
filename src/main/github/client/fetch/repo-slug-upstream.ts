@@ -14,8 +14,17 @@ import { hostedReviewLocalGitOptionArgs, sameOwnerRepo } from './../github-exec-
 export async function getRepoSlug(
   repoPath: string,
   connectionId?: string | null,
-  options: HostedReviewExecutionOptions = {}
+  options: HostedReviewExecutionOptions & { requireVerifiedSshProbe?: boolean } = {}
 ): Promise<GitHubApiRepository | null> {
+  if (options.requireVerifiedSshProbe) {
+    return getGitHubApiRepositoryForRemote(
+      repoPath,
+      'origin',
+      connectionId,
+      getHostedReviewLocalGitOptions(options),
+      { requireVerifiedSshProbe: true }
+    )
+  }
   return getOriginGitHubApiRepository(
     repoPath,
     connectionId,

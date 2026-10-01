@@ -1,0 +1,73 @@
+import { acquire, release, ghExecFileAsync, type LocalGitExecOptions } from '../../gh-utils'
+import {
+  getGitHubApiRepositoryForRemote,
+  resolveGitHubRepoExecution,
+  type GitHubApiRepository
+} from '../../github-api-repository'
+import type { GhExecOptions } from '../github-exec-scope'
+import { repositoryRateLimitGuard } from '../../rate-limit'
+import { waitForCheckDetailsResolution } from '../check/check-details-abort'
+import {
+  GITHUB_CHECK_DETAILS_HOST_TIMEOUT_MS,
+  GITHUB_CHECK_DETAILS_TIMEOUT_MESSAGE
+} from '../../../../shared/github/check-details-deadline'
+
+export async function withActionsRead<T>(
+  repoPath: string,
+  repository: GitHubApiRepository | undefined,
+  connectionId: string | null | undefined,
+  localGitOptions: LocalGitExecOptions,
+  signal: AbortSignal | undefined,
+  read: (repository: GitHubApiRepository, options: GhExecOptions) => Promise<T>
+): Promise<T> {
+  const controller = new AbortController()
+  const abort = (): void => controller.abort(signal?.reason)
+  if (signal?.aborted) {
+    abort()
+  } else {
+    signal?.addEventListener('abort', abort, { once: true })
+  }
+  const timer = setTimeout(
+    () => controller.abort(new Error(GITHUB_CHECK_DETAILS_TIMEOUT_MESSAGE)),
+    GITHUB_CHECK_DETAILS_HOST_TIMEOUT_MS
+  )
+  let acquired = false
+  try {
+    const resolved = await waitForCheckDetailsResolution(
+      resolveGitHubRepoExecution(
+        repoPath,
+        repository ??
+          (() =>
+            getGitHubApiRepositoryForRemote(repoPath, 'origin', connectionId, localGitOptions, {
+              requireVerifiedSshProbe: true
+            })),
+        connectionId,
+        localGitOptions
+      ),
+      controller.signal
+    )
+    if (!resolved.ownerRepo) {
+      throw new Error('A verified GitHub repository is required for Actions')
+    }
+    const options = { ...resolved.ghOptions, signal: controller.signal }
+    const guard = repositoryRateLimitGuard(resolved.ownerRepo, 'core', options)
+    if (guard.blocked) {
+      throw new Error(
+        `GitHub rate limit is low; retry after ${new Date(guard.resetAt * 1000).toISOString()}`
+      )
+    }
+    await acquire(controller.signal)
+    acquired = true
+    return await read(resolved.ownerRepo, options)
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', abort)
+    if (acquired) {
+      release()
+    }
+  }
+}
+export async function actionsJson(endpoint: string, options: GhExecOptions): Promise<unknown> {
+  const { stdout } = await ghExecFileAsync(['api', endpoint], options)
+  return JSON.parse(stdout)
+}
