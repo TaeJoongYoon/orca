@@ -1,3 +1,17 @@
+import {
+  listActionsArtifacts,
+  startActionsArtifactDownload
+} from '../github/client/actions/actions-artifacts'
+import {
+  artifactSessionOwner,
+  readArtifactSession,
+  releaseArtifactSession
+} from '../github/client/actions/artifact-download-sessions'
+import type {
+  ActionsArtifactsQuery,
+  ActionsArtifactDownloadQuery,
+  ActionsArtifactTransferQuery
+} from '../../shared/github/actions-artifact-types'
 import { getRepoSshConnectionId } from '../../shared/execution-host'
 import { isFolderRepo } from '../../shared/repo-kind'
 import type {
@@ -72,6 +86,58 @@ export class RuntimeGitHubReviewQueryCommands {
       getRepoSshConnectionId(repo),
       this.deps.getLocalGitArgs(repo)[0],
       signal
+    )
+  }
+
+  async getRepoActionsArtifacts(
+    selector: string,
+    args: ActionsArtifactsQuery,
+    signal?: AbortSignal
+  ) {
+    const repo = await this.resolveActionsRepo(selector)
+    return listActionsArtifacts(
+      repo.path,
+      args,
+      getRepoSshConnectionId(repo),
+      this.deps.getLocalGitArgs(repo)[0],
+      signal
+    )
+  }
+  async startRepoActionsArtifactDownload(
+    selector: string,
+    args: ActionsArtifactDownloadQuery,
+    signal?: AbortSignal
+  ) {
+    const repo = await this.resolveActionsRepo(selector)
+    return startActionsArtifactDownload(
+      repo.path,
+      args,
+      getRepoSshConnectionId(repo),
+      this.deps.getLocalGitArgs(repo)[0],
+      signal
+    )
+  }
+  async readRepoActionsArtifactChunk(selector: string, args: ActionsArtifactTransferQuery) {
+    const repo = await this.resolveActionsRepo(selector)
+    return readArtifactSession(
+      args.transferId,
+      artifactSessionOwner(
+        repo.path,
+        getRepoSshConnectionId(repo),
+        this.deps.getLocalGitArgs(repo)[0]
+      ),
+      args.offset ?? 0
+    )
+  }
+  async releaseRepoActionsArtifactDownload(selector: string, args: ActionsArtifactTransferQuery) {
+    const repo = await this.resolveActionsRepo(selector)
+    releaseArtifactSession(
+      args.transferId,
+      artifactSessionOwner(
+        repo.path,
+        getRepoSshConnectionId(repo),
+        this.deps.getLocalGitArgs(repo)[0]
+      )
     )
   }
 

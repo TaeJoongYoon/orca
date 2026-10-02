@@ -1,26 +1,50 @@
+import type { ReactNode } from 'react'
 import { actionsDurationSeconds } from '../../../../shared/github/actions-duration'
 import { formatNativeChatDuration } from '../../../../shared/native-chat-turn-status'
-import { actionsStatusLabel } from '../right-sidebar/actions-status-label'
+import { ActionsStatus } from '../right-sidebar/ActionsStatus'
 import { useDelayedStatus } from '@/hooks/use-delayed-status'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { CheckRunJobs } from './CheckRunJobs'
 import type { OpenFile } from '@/store/slices/editor/types/open-file'
 import { loadActionsDetailTab } from '@/store/github/actions-detail-tabs'
+import { ArrowLeft } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { actionsRepositoryUrl, actionsUrl } from '../../../../shared/github/actions-web-url'
 
 export function ActionsRunDetailsPanel({ file }: { file: OpenFile }): React.JSX.Element {
-  const state = file.checkRunDetails
+  return (
+    <ActionsRunDetailsContent
+      state={file.checkRunDetails}
+      refresh={() => {
+        void loadActionsDetailTab(useAppStore.getState, file.id)
+      }}
+      loadMore={() => {
+        void loadActionsDetailTab(useAppStore.getState, file.id, true)
+      }}
+    />
+  )
+}
+
+export function ActionsRunDetailsContent({
+  state,
+  refresh,
+  loadMore,
+  onBack,
+  artifacts
+}: {
+  state: OpenFile['checkRunDetails']
+  refresh: () => void
+  loadMore: () => void
+  onBack?: () => void
+  artifacts?: ReactNode
+}): React.JSX.Element {
   const details = state?.details
-  const showLoading = useDelayedStatus(file.id, state?.loading ? true : null, 150)
+  const showLoading = useDelayedStatus(state?.contextKey ?? '', state?.loading ? true : null, 150)
   const metadata = details?.actions
   const duration = actionsDurationSeconds(details)
   const workflowFile = metadata?.run.workflowPath?.split('@')[0].split('/').at(-1)
   const run = metadata?.run
-  const refresh = (): void => {
-    void loadActionsDetailTab(useAppStore.getState, file.id)
-  }
   const open = (url: string | null): void => {
     if (actionsUrl(url)) {
       void window.api.shell.openUrl(url!)
@@ -29,6 +53,12 @@ export function ActionsRunDetailsPanel({ file }: { file: OpenFile }): React.JSX.
   return (
     <div className="flex h-full min-h-0 flex-col bg-editor-surface">
       <div className="border-b border-border px-5 py-4">
+        {onBack && (
+          <Button variant="ghost" size="sm" className="mb-2" onClick={onBack}>
+            <ArrowLeft className="size-4" />
+            {translate('actions.back', 'Back to Actions')}
+          </Button>
+        )}
         <div className="flex items-start gap-3">
           <h1 className="min-w-0 flex-1 break-words text-base font-medium">
             {run?.displayTitle ?? state?.check.name}
@@ -41,7 +71,7 @@ export function ActionsRunDetailsPanel({ file }: { file: OpenFile }): React.JSX.
           <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
             <span>
               {run.name} · #{run.runNumber} · {translate('actions.attempt', 'Attempt')}{' '}
-              {run.runAttempt} · {actionsStatusLabel(run.conclusion ?? run.status)}
+              {run.runAttempt} · <ActionsStatus status={run.conclusion ?? run.status} />
             </span>
             <span>
               {run.headBranch} · {run.headSha?.slice(0, 7)} · {run.event} · {run.actor}
@@ -89,10 +119,12 @@ export function ActionsRunDetailsPanel({ file }: { file: OpenFile }): React.JSX.
             )}
           </p>
         ) : null}
+        {artifacts}
         {details?.jobs.length ? (
           <CheckRunJobs
             jobs={details.jobs}
             hasFailedJobs={false}
+            actionsStatusColors
             jobLinkLabel={translate('actions.openJob', 'Open job on GitHub')}
           />
         ) : (
@@ -104,14 +136,7 @@ export function ActionsRunDetailsPanel({ file }: { file: OpenFile }): React.JSX.
           )
         )}
         {metadata?.hasNextPage && (
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={state?.loading}
-            onClick={() => {
-              void loadActionsDetailTab(useAppStore.getState, file.id, true)
-            }}
-          >
+          <Button variant="outline" size="sm" disabled={state?.loading} onClick={loadMore}>
             {translate('actions.moreJobs', 'Load more jobs')}
           </Button>
         )}

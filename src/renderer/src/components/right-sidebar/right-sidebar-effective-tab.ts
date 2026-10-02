@@ -25,9 +25,6 @@ export function resolveRightSidebarEffectiveTab({
     return rememberedFolderTab
   }
 
-  if (normalizedActiveTab === 'actions') {
-    return 'actions'
-  }
   if (isVisible(normalizedActiveTab)) {
     return normalizedActiveTab
   }

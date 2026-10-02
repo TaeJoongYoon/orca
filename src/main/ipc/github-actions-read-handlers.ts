@@ -1,14 +1,11 @@
+import { registeredActionsRepo } from './github-actions-repo-routing'
+import { registerGitHubActionsArtifactHandlers } from './github-actions-artifact-handlers'
 import {
   ActionsRunsQuery as RunsSchema,
   ActionsWorkflowsQuery as WorkflowsSchema,
   ActionsDetailsQuery as DetailsSchema
 } from '../../shared/rpc-contract/github-actions-params'
-import {
-  getRepoExecutionHostId,
-  parseExecutionHostId,
-  getRepoSshConnectionId
-} from '../../shared/execution-host'
-import { isFolderRepo } from '../../shared/repo-kind'
+import { getRepoSshConnectionId } from '../../shared/execution-host'
 import { ipcMain } from 'electron'
 import type {
   ActionsRequestContext,
@@ -18,19 +15,10 @@ import type {
 } from '../../shared/github/actions-types'
 import { listActionsRuns, listActionsWorkflows, getWorkflowRunDetails } from '../github/client'
 import type { Store } from '../persistence'
-import { assertRegisteredGitHubRepo, getGitHubLocalGitOptionArgs } from './github-repo-routing'
+import { getGitHubLocalGitOptionArgs } from './github-repo-routing'
 
-function registeredActionsRepo(args: ActionsRequestContext, store: Store) {
-  const repo = assertRegisteredGitHubRepo(args, store)
-  if (
-    isFolderRepo(repo) ||
-    parseExecutionHostId(getRepoExecutionHostId(repo))?.kind === 'runtime'
-  ) {
-    throw new Error('Actions must be requested on the registered Git repository execution host')
-  }
-  return repo
-}
 export function registerGitHubActionsReadHandlers(store: Store): void {
+  registerGitHubActionsArtifactHandlers(store)
   ipcMain.handle('gh:actionsRuns', (_event, args: ActionsRequestContext & ActionsRunsQuery) => {
     const query = RunsSchema.parse(args)
     const repo = registeredActionsRepo(args, store)

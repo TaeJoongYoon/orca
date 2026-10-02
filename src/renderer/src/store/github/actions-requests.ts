@@ -15,6 +15,21 @@ import { callRuntimeRpc, RuntimeRpcCallError } from '../../runtime/runtime-rpc-c
 import { getGitHubRepoSourceSettings, getGitHubWorkItemRequestContext } from './work-item-routing'
 import { translate } from '@/i18n/i18n'
 
+import type {
+  ActionsArtifactsQuery,
+  ActionsArtifactDownloadQuery,
+  ActionsArtifactTransferQuery
+} from '../../../../shared/github/actions-artifact-types'
+
+type ActionsQuery =
+  | ActionsRunsQuery
+  | ActionsWorkflowsQuery
+  | ActionsDetailsQuery
+  | ActionsArtifactsQuery
+  | ActionsArtifactDownloadQuery
+  | ActionsArtifactTransferQuery
+  | { requireVerifiedSshProbe: boolean }
+
 const runsInflight = new Map<string, Promise<ActionsPage<ActionsRun>>>()
 const workflowsInflight = new Map<string, Promise<ActionsPage<ActionsWorkflow>>>()
 const detailsInflight = new Map<string, Promise<ActionsRunDetails>>()
@@ -41,7 +56,11 @@ function shareActionsRequest<T>(
   }
   return promise
 }
-function actionsRequestKey(state: AppState, context: ActionsRequestContext, args: object): string {
+function actionsRequestKey(
+  state: AppState,
+  context: ActionsRequestContext,
+  args: ActionsQuery
+): string {
   const repo = state.repos.find((entry) => entry.id === context.repoId)
   return JSON.stringify([
     repo ? actionsRepoProbeKey(repo) : null,
@@ -75,11 +94,11 @@ function route(state: AppState, context: ActionsRequestContext) {
     ? { ...target, runtimeRepoId: context.sourceContext?.repoId ?? repo.id }
     : target
 }
-async function request<T>(
+export async function requestActions<T>(
   state: AppState,
   context: ActionsRequestContext,
   method: string,
-  args: object,
+  args: ActionsQuery,
   local: () => Promise<T>
 ): Promise<T> {
   const target = route(state, context)
@@ -109,7 +128,7 @@ export async function fetchActionsRepository(
   context: ActionsRequestContext
 ): Promise<GitHubRepositoryIdentity | null> {
   const args = { requireVerifiedSshProbe: true }
-  return request(state, context, 'github.repoSlug', args, () =>
+  return requestActions(state, context, 'github.repoSlug', args, () =>
     window.api.gh.repoSlug({ ...context, ...args })
   )
 }
@@ -119,7 +138,7 @@ export async function fetchActionsRuns(
   args: ActionsRunsQuery
 ): Promise<ActionsPage<ActionsRun>> {
   const read = () =>
-    request(state, context, 'github.actionsRuns', args, () =>
+    requestActions(state, context, 'github.actionsRuns', args, () =>
       window.api.gh.actionsRuns({ ...context, ...args })
     )
   return args.noCache
@@ -132,7 +151,7 @@ export async function fetchActionsWorkflows(
   args: ActionsWorkflowsQuery
 ): Promise<ActionsPage<ActionsWorkflow>> {
   const read = () =>
-    request(state, context, 'github.actionsWorkflows', args, () =>
+    requestActions(state, context, 'github.actionsWorkflows', args, () =>
       window.api.gh.actionsWorkflows({ ...context, ...args })
     )
   return args.noCache
@@ -145,7 +164,7 @@ export async function fetchActionsRunDetails(
   args: ActionsDetailsQuery
 ): Promise<ActionsRunDetails> {
   const read = () =>
-    request(state, context, 'github.actionsRunDetails', args, () =>
+    requestActions(state, context, 'github.actionsRunDetails', args, () =>
       window.api.gh.actionsRunDetails({ ...context, ...args })
     )
   return args.noCache

@@ -18,6 +18,24 @@ export function createGitHubApi(): WebGitHubApi {
   const route = <Result>(method: WebGitHubRuntimeMethod, args?: unknown): Promise<Result> =>
     callRuntimeResult<Result>(method, mapRepoPathArg(args))
   const githubApi = {
+    actionsArtifacts: (args) =>
+      route<WebGitHubResult<'actionsArtifacts'>>(GITHUB_WEB_RPC_METHODS.actionsArtifacts, args),
+    startActionsArtifactDownload: (args) =>
+      route<WebGitHubResult<'startActionsArtifactDownload'>>(
+        GITHUB_WEB_RPC_METHODS.startActionsArtifactDownload,
+        args
+      ),
+    readActionsArtifactChunk: (args) =>
+      route<WebGitHubResult<'readActionsArtifactChunk'>>(
+        GITHUB_WEB_RPC_METHODS.readActionsArtifactChunk,
+        args
+      ),
+    releaseActionsArtifactDownload: (args) =>
+      route<WebGitHubResult<'releaseActionsArtifactDownload'>>(
+        GITHUB_WEB_RPC_METHODS.releaseActionsArtifactDownload,
+        args
+      ),
+
     actionsRuns: (args) =>
       route<WebGitHubResult<'actionsRuns'>>(GITHUB_WEB_RPC_METHODS.actionsRuns, args),
     actionsWorkflows: (args) =>

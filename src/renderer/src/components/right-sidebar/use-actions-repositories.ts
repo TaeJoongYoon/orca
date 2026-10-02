@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAppStore } from '@/store'
 import { actionsCandidateRepos, actionsRepoProbeKey } from './actions-repositories'
 import { fetchActionsRepository } from '@/store/github/actions-requests'
+import { isFolderRepo } from '../../../../shared/repo-kind'
 import type { Repo } from '../../../../shared/repo-types'
 import type { GitHubRepositoryIdentity } from '../../../../shared/github/pull-request-types'
 
@@ -15,10 +16,18 @@ const probes = new Map<
   }
 >()
 
-export function useActionsRepositories(workspaceId: string | null) {
-  const key = useAppStore((state) =>
-    JSON.stringify(actionsCandidateRepos(state, workspaceId).map(actionsRepoProbeKey))
+export function useActionsRepositories(
+  workspaceId: string | null,
+  selectedRepoIds?: ReadonlySet<string>
+) {
+  const candidates = useCallback(
+    (state: ReturnType<typeof useAppStore.getState>): Repo[] =>
+      selectedRepoIds
+        ? state.repos.filter((repo) => selectedRepoIds.has(repo.id) && !isFolderRepo(repo))
+        : actionsCandidateRepos(state, workspaceId),
+    [selectedRepoIds, workspaceId]
   )
+  const key = useAppStore((state) => JSON.stringify(candidates(state).map(actionsRepoProbeKey)))
   const [result, setResult] = useState<{
     key: string
     options: ActionsRepositoryOption[]
@@ -29,7 +38,7 @@ export function useActionsRepositories(workspaceId: string | null) {
   useEffect(() => {
     let live = true
     setResult({ key, options: [], error: null, loading: true })
-    const currentCandidates = actionsCandidateRepos(useAppStore.getState(), workspaceId)
+    const currentCandidates = candidates(useAppStore.getState())
     void Promise.all(
       currentCandidates.map(async (repo) => {
         const probeKey = actionsRepoProbeKey(repo)
@@ -77,11 +86,11 @@ export function useActionsRepositories(workspaceId: string | null) {
     return () => {
       live = false
     }
-  }, [key, retry, workspaceId])
+  }, [key, retry, candidates])
   return {
     available:
       result.key !== key || result.loading
-        ? actionsCandidateRepos(useAppStore.getState(), workspaceId).some(
+        ? candidates(useAppStore.getState()).some(
             (repo) => probes.get(actionsRepoProbeKey(repo))?.repository !== null
           )
         : result.options.length > 0 || Boolean(result.error),

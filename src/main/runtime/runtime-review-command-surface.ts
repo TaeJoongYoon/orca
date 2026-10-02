@@ -9,6 +9,10 @@ type GitLabQueryName = Exclude<keyof RuntimeGitLabQueryCommands, 'constructor'>
 type GitLabMutationName = Exclude<keyof RuntimeGitLabMutationCommands, 'constructor'>
 type GitHubProjectName = Exclude<keyof RuntimeGitHubProjectCommands, 'constructor'>
 type GitHubReviewQueryName =
+  | 'getRepoActionsArtifacts'
+  | 'startRepoActionsArtifactDownload'
+  | 'readRepoActionsArtifactChunk'
+  | 'releaseRepoActionsArtifactDownload'
   | 'getRepoActionsRuns'
   | 'getRepoActionsWorkflows'
   | 'getRepoActionsRunDetails'
@@ -85,6 +89,10 @@ export function installRuntimeReviewCommandSurface(
     updateGitLabRepoMRState: glm.updateGitLabRepoMRState.bind(glm),
     updateGitLabRepoMR: glm.updateGitLabRepoMR.bind(glm),
     updateGitLabRepoMRReviewers: glm.updateGitLabRepoMRReviewers.bind(glm),
+    getRepoActionsArtifacts: ghq.getRepoActionsArtifacts.bind(ghq),
+    startRepoActionsArtifactDownload: ghq.startRepoActionsArtifactDownload.bind(ghq),
+    readRepoActionsArtifactChunk: ghq.readRepoActionsArtifactChunk.bind(ghq),
+    releaseRepoActionsArtifactDownload: ghq.releaseRepoActionsArtifactDownload.bind(ghq),
     getRepoActionsRuns: ghq.getRepoActionsRuns.bind(ghq),
     getRepoActionsWorkflows: ghq.getRepoActionsWorkflows.bind(ghq),
     getRepoActionsRunDetails: ghq.getRepoActionsRunDetails.bind(ghq),

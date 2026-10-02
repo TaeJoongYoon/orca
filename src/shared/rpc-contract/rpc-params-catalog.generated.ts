@@ -215,6 +215,11 @@ import {
   WorktreeSelector as WorktreeSelectorOfGitParams
 } from './git-params'
 import { BindableAccounts, ValidateAccountBinding } from './github-account-binding-params'
+import {
+  ActionsArtifactDownload,
+  ActionsArtifactTransfer,
+  ActionsArtifacts
+} from './github-actions-artifact-params'
 import { ActionsRunDetails, ActionsRuns, ActionsWorkflows } from './github-actions-params'
 import { CreateIssue, Issue, IssueComment, UpdateIssue } from './github-issue-params'
 import {
@@ -827,6 +832,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'git.submoduleStatus': GitSubmoduleStatus,
   'git.unstage': GitFilePath,
   'git.upstreamStatus': GitTargetedRemote,
+  'github.actionsArtifacts': ActionsArtifacts,
   'github.actionsRunDetails': ActionsRunDetails,
   'github.actionsRuns': ActionsRuns,
   'github.actionsWorkflows': ActionsWorkflows,
@@ -865,6 +871,8 @@ export const RPC_PARAMS_BY_METHOD = {
   'github.project.viewTable': ProjectViewTable,
   'github.project.workItemDetailsBySlug': ProjectWorkItemDetailsBySlug,
   'github.rateLimit': RateLimit,
+  'github.readActionsArtifactChunk': ActionsArtifactTransfer,
+  'github.releaseActionsArtifactDownload': ActionsArtifactTransfer,
   'github.removePRReviewers': RemovePrReviewers,
   'github.repoSlug': RepoSlug,
   'github.repoUpstream': RepoSelector,
@@ -874,6 +882,7 @@ export const RPC_PARAMS_BY_METHOD = {
   'github.setPRAutoMerge': SetPrAutoMerge,
   'github.setPRCommentReaction': PRCommentReaction,
   'github.setPRFileViewed': PullRequestFileViewed,
+  'github.startActionsArtifactDownload': ActionsArtifactDownload,
   'github.updateIssue': UpdateIssue,
   'github.updatePR': UpdatePr,
   'github.updatePRState': UpdatePrState,

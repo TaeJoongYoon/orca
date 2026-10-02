@@ -1,4 +1,8 @@
 export type WebGitHubRouteKey =
+  | 'actionsArtifacts'
+  | 'startActionsArtifactDownload'
+  | 'readActionsArtifactChunk'
+  | 'releaseActionsArtifactDownload'
   | 'actionsRuns'
   | 'actionsWorkflows'
   | 'actionsRunDetails'
@@ -55,6 +59,10 @@ export type WebGitHubRouteKey =
   | 'updateIssueTypeBySlug'
 
 export type WebGitHubRuntimeMethod =
+  | 'github.actionsArtifacts'
+  | 'github.startActionsArtifactDownload'
+  | 'github.readActionsArtifactChunk'
+  | 'github.releaseActionsArtifactDownload'
   | 'github.actionsRuns'
   | 'github.actionsWorkflows'
   | 'github.actionsRunDetails'
@@ -111,6 +119,10 @@ export type WebGitHubRuntimeMethod =
   | 'github.project.updateIssueTypeBySlug'
 
 export const GITHUB_WEB_RPC_METHODS = {
+  actionsArtifacts: 'github.actionsArtifacts',
+  startActionsArtifactDownload: 'github.startActionsArtifactDownload',
+  readActionsArtifactChunk: 'github.readActionsArtifactChunk',
+  releaseActionsArtifactDownload: 'github.releaseActionsArtifactDownload',
   actionsRuns: 'github.actionsRuns',
   actionsWorkflows: 'github.actionsWorkflows',
   actionsRunDetails: 'github.actionsRunDetails',

@@ -26,9 +26,7 @@ test('Actions discovery failure remains reachable and recovers without changing 
         }
       }))
     }))
-    store.getState().setRightSidebarOpen(true)
-    store.getState().setRightSidebarTab('explorer')
-    store.getState().setRightSidebarWidth(360)
+    store.getState().openTaskPage({ taskSource: 'github' })
   })
   const workspace = await page.evaluate(() => window.__store?.getState().activeWorktreeId)
   await page.getByRole('button', { name: 'Actions', exact: true }).click()

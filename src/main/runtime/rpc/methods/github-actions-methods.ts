@@ -1,3 +1,4 @@
+import { GITHUB_ACTIONS_ARTIFACT_METHODS } from './github-actions-artifact-methods'
 import { defineMethod } from '../core'
 import {
   ActionsRuns,
@@ -5,6 +6,7 @@ import {
   ActionsRunDetails
 } from '../../../../shared/rpc-contract/github-actions-params'
 export const GITHUB_ACTIONS_METHODS = [
+  ...GITHUB_ACTIONS_ARTIFACT_METHODS,
   defineMethod({
     name: 'github.actionsRuns',
     params: ActionsRuns,

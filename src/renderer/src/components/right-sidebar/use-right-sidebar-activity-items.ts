@@ -1,6 +1,5 @@
-import { useActionsRepositories } from './use-actions-repositories'
 import { useMemo } from 'react'
-import { Plug, Files, GitBranch, ListChecks, Workflow, Play } from 'lucide-react'
+import { Plug, Files, GitBranch, ListChecks, Workflow } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useRepoById } from '@/store/selectors'
 import { isFolderRepo } from '../../../../shared/repo-kind'
@@ -41,7 +40,6 @@ export function useRightSidebarActivityItems({
   const activeWorktree = useAppStore((s) =>
     activeWorktreeId ? (s.getKnownWorktreeById(activeWorktreeId) ?? null) : null
   )
-  const actionsRepositories = useActionsRepositories(activeWorktreeId)
   const activeRepo = useRepoById(activeWorktree?.repoId ?? null)
   const activeWorkspaceScope = parseWorkspaceKey(activeWorktreeId ?? '')
   const isFolderWorkspace = activeWorkspaceScope?.type === 'folder'
@@ -106,16 +104,6 @@ export function useRightSidebarActivityItems({
         shortcut: checksShortcut === 'Unassigned' ? '' : checksShortcut,
         gitOnly: true
       },
-      ...(actionsRepositories.available
-        ? [
-            {
-              id: 'actions' as const,
-              icon: Play,
-              title: translate('actions.title', 'Actions'),
-              shortcut: ''
-            }
-          ]
-        : []),
       {
         id: 'ports',
         icon: Plug,
@@ -128,7 +116,6 @@ export function useRightSidebarActivityItems({
       ...getPluginPanelActivityItems(visiblePluginPanels, pluginPanelErrors)
     ],
     [
-      actionsRepositories.available,
       checksShortcut,
       explorerShortcut,
       pluginPanelErrors,

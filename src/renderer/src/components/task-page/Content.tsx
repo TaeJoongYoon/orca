@@ -1,4 +1,5 @@
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
+import { TaskPageActions } from './github/actions/TaskPageActions'
 import PullRequestPage from '@/components/PullRequestPage'
 import GitHubItemDialog from '@/components/GitHubItemDialog'
 import ProjectViewWrapper from '@/components/github-project/ProjectViewWrapper'
@@ -57,6 +58,8 @@ export function TaskPageContent({
         onClose={closeTaskDetailPage}
       />
     )
+  ) : taskSource === 'github' && githubMode === 'actions' ? (
+    <TaskPageActions selectedRepoIds={repoSelection} />
   ) : taskSource === 'github' && githubMode === 'project' ? (
     <div className="mt-3 flex min-h-0 min-w-0 max-h-full flex-col overflow-hidden rounded-md border border-border/50 bg-muted/50 shadow-sm">
       <ProjectViewWrapper selectedRepoIds={repoSelection} />

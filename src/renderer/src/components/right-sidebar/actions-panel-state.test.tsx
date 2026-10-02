@@ -131,6 +131,22 @@ describe('Actions panel generations and registered repositories', () => {
     expect(result.current.available).toBe(false)
     expect(result.current.error).toBeNull()
   })
+  it('uses the Tasks project selection without requiring an active workspace', async () => {
+    const selected = { ...TEST_REPO, id: 'tasks-selected', path: '/tasks-selected' }
+    const other = { ...TEST_REPO, id: 'tasks-other', path: '/tasks-other' }
+    const folder = { ...TEST_REPO, id: 'tasks-folder', kind: 'folder' as const }
+    useAppStore.setState({ repos: [selected, other, folder], worktreesByRepo: {} })
+    const probe = vi.spyOn(requests, 'fetchActionsRepository').mockResolvedValue(repository)
+    const selection = new Set([selected.id, folder.id])
+    const { result } = renderHook(() => useActionsRepositories(null, selection))
+    await settle()
+    expect(result.current.options.map((entry) => entry.repo.id)).toEqual([selected.id])
+    expect(probe).toHaveBeenCalledTimes(1)
+    expect(probe).toHaveBeenCalledWith(expect.anything(), {
+      repoId: selected.id,
+      repoPath: selected.path
+    })
+  })
   it('chooses only registered Git children in a folder workspace', () => {
     const folder = makeFolderWorkspace({ folderPath: '/repo1' })
     const child = { ...TEST_REPO, id: 'child', path: '/repo1/child' }

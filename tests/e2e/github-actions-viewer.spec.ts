@@ -179,10 +179,12 @@ test('repository Actions filters, paging and all-job details stay hidden in ligh
         }
       }))
     }))
-    store.getState().setRightSidebarOpen(true)
-    store.getState().setRightSidebarTab('actions')
-    store.getState().setRightSidebarWidth(360)
+    store.getState().openTaskPage({ taskSource: 'github' })
   })
+  await page.getByRole('button', { name: 'Actions', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Issues', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'PRs', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Projects', exact: true })).toBeVisible()
   const row = page.getByRole('button', { name: /Repository workflow without a pull request/ })
   await expect(row).toBeVisible()
   const calls = await electronApp.evaluate(() => globalThis.__actionsTestQueries?.length ?? 0)
@@ -205,10 +207,10 @@ test('repository Actions filters, paging and all-job details stay hidden in ligh
   await expect
     .poll(() => electronApp.evaluate(() => globalThis.__actionsTestQueries?.at(-1)?.branch))
     .toBe('topic & release')
-  await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeEnabled()
-  await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Next page', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'Next page', exact: true }).click()
   await expect(page.getByRole('button', { name: /Older workflow run/ })).toBeVisible()
-  await page.getByRole('button', { name: 'Previous', exact: true }).click()
+  await page.getByRole('button', { name: 'Previous page', exact: true }).click()
   await expect(row).toBeVisible()
   await page.getByRole('button', { name: 'Load more workflows', exact: true }).click()
   await expect(page.getByText('Workflow options temporarily unavailable')).toBeVisible()
@@ -235,11 +237,9 @@ test('repository Actions filters, paging and all-job details stay hidden in ligh
         throw new Error('Missing store')
       }
       await store.getState().updateSettingsOrThrow({ theme })
-      store.getState().setRightSidebarTab('actions')
-      store.getState().setRightSidebarWidth(theme === 'light' ? 360 : 280)
     }, theme)
     await expect(row).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeEnabled()
+    await expect(page.getByRole('button', { name: 'Next page', exact: true })).toBeEnabled()
     await expect(page.getByRole('status').filter({ hasText: 'Loading runs' })).toHaveCount(0)
     await page.screenshot({ path: path.join(screenshotDir, `actions-list-${theme}.png`) })
   }
@@ -258,7 +258,6 @@ test('repository Actions filters, paging and all-job details stay hidden in ligh
         throw new Error('Missing store')
       }
       await store.getState().updateSettingsOrThrow({ theme })
-      store.getState().setRightSidebarTab('actions')
     }, theme)
     await page.waitForTimeout(250)
     await expect(
@@ -282,20 +281,18 @@ test('repository Actions filters, paging and all-job details stay hidden in ligh
         window.__store?.getState().openFiles.filter((file) => file.mode === 'check-details').length
     )
   ).toBe(tabCount)
+  await page.getByRole('button', { name: 'Back to Actions', exact: true }).click()
+  await expect(row).toBeVisible()
   await page.getByRole('textbox', { name: 'Branch', exact: true }).fill('no-match')
   await page.getByRole('textbox', { name: 'Branch', exact: true }).press('Enter')
-  await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Next page', exact: true })).toBeEnabled()
   await electronApp.evaluate(({ ipcMain }) => {
     ipcMain.removeHandler('gh:actionsRuns')
     ipcMain.handle('gh:actionsRuns', async () => {
       throw new Error('Synthetic authentication failure: sign in to GitHub')
     })
   })
-  await page
-    .getByRole('heading', { name: 'Actions', exact: true })
-    .locator('..')
-    .getByRole('button', { name: 'Refresh', exact: true })
-    .click()
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click()
   await expect(page.getByText('Synthetic authentication failure: sign in to GitHub')).toBeVisible()
   await electronApp.evaluate(({ ipcMain }, repository) => {
     ipcMain.removeHandler('gh:actionsRuns')

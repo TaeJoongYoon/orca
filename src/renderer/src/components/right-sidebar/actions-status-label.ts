@@ -19,7 +19,11 @@ export function actionsStatusLabel(status: string | null): string {
     case 'success':
       return translate('actions.statusSuccess', 'Success')
     case 'failure':
+    case 'failed':
+    case 'error':
       return translate('actions.statusFailure', 'Failure')
+    case 'startup_failure':
+      return translate('actions.statusStartupFailure', 'Startup failure')
     case 'cancelled':
       return translate('actions.statusCancelled', 'Cancelled')
     case 'timed_out':

@@ -54,7 +54,7 @@ export function useTaskPageProviderState(model: TaskPageSourceAvailabilityModel)
 
   // Why: Project mode is a GitHub sub-tab — visible on the GitHub source, but actual entry is gated on a non-null activeProject.
   const projectModeVisible = taskSource === 'github'
-  const [githubMode, setGithubMode] = useState<'items' | 'project'>('items')
+  const [githubMode, setGithubMode] = useState<'items' | 'project' | 'actions'>('items')
 
   // ── GitLab task-source state ──────────────────────────────────────
   // Why: parallel to Linear's slim per-source state — skips workItemsCache and cross-repo aggregation; fetches directly via window.api.gl for the primary repo.

@@ -18801,7 +18801,25 @@
     "ownerChanged": "Repository host or account changed. Reopen this run from Actions.",
     "hostUpgrade": "This host needs an Orca update to browse Actions. Open Actions on GitHub in the meantime.",
     "duration": "Duration",
-    "openWorkflow": "Open workflow"
+    "openWorkflow": "Open workflow",
+    "back": "Back to Actions",
+    "statusStartupFailure": "Startup failure",
+    "artifacts": {
+      "title": "Artifacts",
+      "refresh": "Refresh artifacts",
+      "loading": "Loading artifacts…",
+      "empty": "No artifacts are available for this run.",
+      "expires": "Expires",
+      "large": "Over 64 MiB. Use Open run on GitHub to download.",
+      "expired": "Expired",
+      "downloadName": "Download {{name}}",
+      "download": "Download ZIP",
+      "more": "Load more artifacts",
+      "limit": "Showing up to 1,000 artifacts. Open the run on GitHub for more.",
+      "saving": "Downloading ZIP…",
+      "cancel": "Cancel download",
+      "saved": "Saved ZIP to {{path}}"
+    }
   },
   "checkRun": {
     "openJob": "Open job"
