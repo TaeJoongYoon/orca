@@ -29,8 +29,24 @@ createHelperApp()
 
 function buildUniversalBinary() {
   const builtBinaries = universalTriples.map((triple) => {
-    run('swift', ['build', '-c', 'release', '--package-path', packagePath, '--triple', triple])
-    return path.join(packagePath, '.build', triple, 'release', 'orca-computer-use-macos')
+    const args = [
+      'build',
+      '-c',
+      'release',
+      '--package-path',
+      packagePath,
+      '--triple',
+      triple,
+      '--scratch-path',
+      path.join(packagePath, '.build', triple)
+    ]
+    run('swift', args)
+    // Swift build systems use different output layouts; ask the same build for its directory.
+    const result = run('swift', [...args, '--show-bin-path'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'inherit']
+    })
+    return path.join(result.stdout.trim(), 'orca-computer-use-macos')
   })
   mkdirSync(path.dirname(binaryPath), { recursive: true })
   run('lipo', ['-create', ...builtBinaries, '-output', binaryPath])
@@ -83,14 +99,15 @@ function resolveSigningIdentity() {
   return releaseMatch?.[1] ?? developmentMatch?.[1] ?? '-'
 }
 
-function run(command, args) {
-  const result = spawnSync(command, args, { stdio: 'inherit' })
+function run(command, args, options = {}) {
+  const result = spawnSync(command, args, { stdio: 'inherit', ...options })
   if (result.signal) {
     process.kill(process.pid, result.signal)
   }
   if (result.status !== 0) {
     process.exit(result.status ?? 1)
   }
+  return result
 }
 
 function infoPlist() {
