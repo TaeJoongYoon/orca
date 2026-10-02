@@ -6,6 +6,7 @@ import * as requests from '@/store/github/actions-artifact-requests'
 import { TEST_REPO } from '@/store/slices/store-test-helpers'
 import type { ActionsArtifact } from '../../../../../../shared/github/actions-artifact-types'
 import type { PreloadApi } from '../../../../../../preload/api-types'
+import { ACTIONS_ARTIFACT_MAX_BYTES } from '../../../../../../shared/github/actions-artifact-types'
 
 const repository = { owner: 'acme', repo: 'widgets', host: 'github.com' }
 const option = { repo: TEST_REPO, repository }
@@ -89,6 +90,19 @@ it('disables downloads for expired artifacts', async () => {
   mount()
   expect((await ready()).hasAttribute('disabled')).toBe(true)
   expect(screen.getByText('Expired')).toBeTruthy()
+})
+it('shows size and expiry and prevents archives over the download limit', async () => {
+  vi.mocked(requests.fetchActionsArtifacts).mockResolvedValue({
+    ...page,
+    items: [
+      { ...artifact, sizeBytes: ACTIONS_ARTIFACT_MAX_BYTES + 1, expiresAt: '2030-01-01T00:00:00Z' }
+    ]
+  })
+  mount()
+  expect((await ready()).hasAttribute('disabled')).toBe(true)
+  expect(screen.getByText(/64\.0 MB.*Expires/)).toBeTruthy()
+  expect(screen.getByText('Over 64 MiB. Use Open run on GitHub to download.')).toBeTruthy()
+  expect(requests.startActionsArtifactDownload).not.toHaveBeenCalled()
 })
 it('renders a list failure and retries successfully', async () => {
   vi.mocked(requests.fetchActionsArtifacts).mockRejectedValueOnce(new Error('List unavailable'))

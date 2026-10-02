@@ -17,7 +17,11 @@ const metadata = {
   expired: false,
   workflow_run: { id: 900 }
 }
-const zip = Buffer.from('504b0506000000000000000000000000000000000000', 'hex')
+// A stored ZIP with an inert hello.txt payload; never extracted or executed.
+const zip = Buffer.from(
+  'UEsDBBQAAAAAAAAAIVwCDJr/IwAAACMAAAAJAAAAaGVsbG8udHh0SGVsbG8gZnJvbSB0aGUgT3JjYSBtb2NrIGFydGlmYWN0LgpQSwECFAMUAAAAAAAAACFcAgya/yMAAAAjAAAACQAAAAAAAAAAAAAAgAEAAAAAaGVsbG8udHh0UEsFBgAAAAABAAEANwAAAEoAAAAAAA==',
+  'base64'
+)
 const call = vi.fn<typeof gh.ghExecFileAsync>()
 beforeEach(() => {
   vi.spyOn(execution, 'resolveGitHubRepoExecution').mockResolvedValue({
@@ -83,5 +87,17 @@ describe('Actions artifacts', () => {
         stderr: ''
       })
     await expect(startActionsArtifactDownload('/repo', query)).rejects.toThrow('ZIP archive')
+  })
+  it.each([
+    'HTTP 403 authorization required',
+    'HTTP 404 artifact not found',
+    'Network connection reset'
+  ])('propagates an archive request failure: %s', async (message) => {
+    call
+      .mockResolvedValueOnce({ stdout: JSON.stringify(metadata), stderr: '' })
+      .mockRejectedValueOnce(new Error(message))
+    await expect(startActionsArtifactDownload('/repo', query)).rejects.toThrow(message)
+    expect(call).toHaveBeenCalledTimes(2)
+    expect(gh.release).toHaveBeenCalled()
   })
 })
