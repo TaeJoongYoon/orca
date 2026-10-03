@@ -1,3 +1,4 @@
+import { ACTIONS_ARTIFACT_CLIENT_TIMEOUT_MS } from '../../../../shared/github/actions-artifact-types'
 import { actionsRepoProbeKey } from './actions-request-identity'
 import type { AppState } from '../types'
 import type {
@@ -108,7 +109,12 @@ export async function requestActions<T>(
           { kind: 'environment', environmentId: target.environmentId },
           method,
           { repo: target.runtimeRepoId, ...args },
-          { timeoutMs: 30_000 }
+          {
+            timeoutMs:
+              method === 'github.startActionsArtifactDownload'
+                ? ACTIONS_ARTIFACT_CLIENT_TIMEOUT_MS
+                : 30_000
+          }
         )
       : await local()
   } catch (error) {

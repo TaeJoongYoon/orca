@@ -96,6 +96,10 @@ export function useActionsArtifacts(option: ActionsRepositoryOption, runId: numb
       }
     } catch (error) {
       if (alive.current) {
+        if (canceled.current) {
+          setDownload({ id: null, percent: 0, saved: null, error: null })
+          return
+        }
         setDownload({
           id: null,
           percent: 0,

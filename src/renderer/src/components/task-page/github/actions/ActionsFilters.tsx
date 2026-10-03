@@ -138,7 +138,12 @@ export function ActionsFilters({
       {model.workflows.error && (
         <div role="alert" className="text-xs text-destructive">
           {model.workflows.error}
-          <Button variant="link" size="xs" onClick={model.refresh}>
+          <Button
+            variant="link"
+            size="xs"
+            disabled={model.workflows.loading}
+            onClick={model.moreWorkflows}
+          >
             {translate('actions.retryWorkflows', 'Retry workflows')}
           </Button>
         </div>

@@ -9,10 +9,7 @@ import type { RpcClientContextValue } from '../../../transport/rpc-client-contex
 
 const HOST = 'host-1'
 
-/**
- * `useAllHostClients` reads the shared context through the module-private handle in
- * `client-context.tsx`, so exposing it mounts the real acquire/release cycle over a scripted client.
- */
+// The shared context mounts the real acquire/release cycle over a scripted client.
 export const notificationTestScreenMountExposures: readonly OperationExposure[] = [
   hostClientContextExposure
 ]

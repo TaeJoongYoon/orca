@@ -3,7 +3,7 @@ import type { LocalGitExecOptions } from '../../gh-utils'
 import { ACTIONS_ARTIFACT_CHUNK_BYTES } from '../../../../shared/github/actions-artifact-types'
 const sessions = new Map<
   string,
-  { owner: string; archive: Buffer; timer: ReturnType<typeof setTimeout> }
+  { owner: string; archive: Buffer; timer: ReturnType<typeof setTimeout>; dispose: () => void }
 >()
 export function artifactSessionOwner(
   repoPath: string,
@@ -27,15 +27,33 @@ export function releaseArtifactSession(transferId: string, owner: string): void 
   }
   clearTimeout(session.timer)
   sessions.delete(transferId)
+  session.dispose()
 }
-export function createArtifactSession(owner: string, archive: Buffer, fileName: string) {
+export function createArtifactSession(
+  owner: string,
+  archive: Buffer,
+  fileName: string,
+  signal?: AbortSignal,
+  onRelease?: () => void
+) {
+  signal?.throwIfAborted()
   if (sessions.size >= 2) {
     throw new Error('Finish another artifact download before starting a new one')
   }
   const transferId = randomUUID()
   const timer = setTimeout(() => releaseArtifactSession(transferId, owner), 5 * 60_000)
   timer.unref()
-  sessions.set(transferId, { owner, archive, timer })
+  const abort = () => releaseArtifactSession(transferId, owner)
+  sessions.set(transferId, {
+    owner,
+    archive,
+    timer,
+    dispose: () => {
+      signal?.removeEventListener('abort', abort)
+      onRelease?.()
+    }
+  })
+  signal?.addEventListener('abort', abort, { once: true })
   return { transferId, sizeBytes: archive.length, fileName }
 }
 export function readArtifactSession(transferId: string, owner: string, offset: number) {

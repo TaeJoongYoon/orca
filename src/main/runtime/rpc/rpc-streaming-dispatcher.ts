@@ -133,6 +133,7 @@ export class RpcStreamingDispatcher {
           return method.handler(effectiveParams, {
             runtime,
             signal: options?.signal,
+            retainConnectionLifetime: options?.retainConnectionLifetime,
             requestId: request.id,
             connectionId: options?.connectionId,
             subscriptionRegistrationVersion,
@@ -188,6 +189,7 @@ export class RpcStreamingDispatcher {
         {
           runtime,
           signal: options?.signal,
+          retainConnectionLifetime: options?.retainConnectionLifetime,
           requestId: request.id,
           connectionId: options?.connectionId,
           clientId: options?.clientId,

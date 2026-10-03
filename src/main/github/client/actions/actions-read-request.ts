@@ -18,7 +18,11 @@ export async function withActionsRead<T>(
   connectionId: string | null | undefined,
   localGitOptions: LocalGitExecOptions,
   signal: AbortSignal | undefined,
-  read: (repository: GitHubApiRepository, options: GhExecOptions) => Promise<T>
+  read: (repository: GitHubApiRepository, options: GhExecOptions) => Promise<T>,
+  deadline = {
+    timeoutMs: GITHUB_CHECK_DETAILS_HOST_TIMEOUT_MS,
+    message: GITHUB_CHECK_DETAILS_TIMEOUT_MESSAGE
+  }
 ): Promise<T> {
   const controller = new AbortController()
   const abort = (): void => controller.abort(signal?.reason)
@@ -27,10 +31,7 @@ export async function withActionsRead<T>(
   } else {
     signal?.addEventListener('abort', abort, { once: true })
   }
-  const timer = setTimeout(
-    () => controller.abort(new Error(GITHUB_CHECK_DETAILS_TIMEOUT_MESSAGE)),
-    GITHUB_CHECK_DETAILS_HOST_TIMEOUT_MS
-  )
+  const timer = setTimeout(() => controller.abort(new Error(deadline.message)), deadline.timeoutMs)
   let acquired = false
   try {
     const resolved = await waitForCheckDetailsResolution(
@@ -58,7 +59,7 @@ export async function withActionsRead<T>(
     }
     await acquire(controller.signal)
     acquired = true
-    return await read(resolved.ownerRepo, options)
+    return await waitForCheckDetailsResolution(read(resolved.ownerRepo, options), controller.signal)
   } finally {
     clearTimeout(timer)
     signal?.removeEventListener('abort', abort)

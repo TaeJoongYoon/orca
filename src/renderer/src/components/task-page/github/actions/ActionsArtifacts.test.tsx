@@ -161,12 +161,31 @@ it('cancels an active transfer and removes partial local bytes', async () => {
   await act(async () => {
     resolveTransfer?.({ transferId: 'remote', sizeBytes: 4, fileName: 'test-report.zip' })
   })
-  expect(await screen.findByRole('alert')).toHaveProperty(
-    'textContent',
-    'Artifact download canceled'
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: 'Download test-report' }).hasAttribute('disabled')
+    ).toBe(false)
   )
+  expect(screen.queryByRole('alert')).toBeNull()
   expect(requests.readActionsArtifactChunk).not.toHaveBeenCalled()
   expect(requests.releaseActionsArtifactDownload).toHaveBeenCalled()
   expect(cancel).toHaveBeenCalledWith({ transferId: 'local' })
+  expect(finish).not.toHaveBeenCalled()
+})
+
+it('localizes invalid chunks and cleans up both transfers', async () => {
+  vi.mocked(requests.readActionsArtifactChunk).mockResolvedValue({
+    contentBase64: 'UEsFBg==',
+    nextOffset: 0,
+    done: false
+  })
+  mount()
+  fireEvent.click(await ready())
+  expect(await screen.findByRole('alert')).toHaveProperty(
+    'textContent',
+    'Invalid artifact download chunk'
+  )
+  expect(cancel).toHaveBeenCalledWith({ transferId: 'local' })
+  expect(requests.releaseActionsArtifactDownload).toHaveBeenCalled()
   expect(finish).not.toHaveBeenCalled()
 })

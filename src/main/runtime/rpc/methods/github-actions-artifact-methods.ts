@@ -14,8 +14,24 @@ export const GITHUB_ACTIONS_ARTIFACT_METHODS = [
   defineMethod({
     name: 'github.startActionsArtifactDownload',
     params: ActionsArtifactDownload,
-    handler: (params, { runtime, signal }) =>
-      runtime.startRepoActionsArtifactDownload(params.repo, params, signal)
+    handler: async (params, { runtime, signal, retainConnectionLifetime }) => {
+      const lifetime = retainConnectionLifetime?.()
+      let retained = false
+      try {
+        const transfer = await runtime.startRepoActionsArtifactDownload(
+          params.repo,
+          params,
+          lifetime?.signal ?? signal,
+          lifetime?.dispose
+        )
+        retained = true
+        return transfer
+      } finally {
+        if (!retained) {
+          lifetime?.dispose()
+        }
+      }
+    }
   }),
   defineMethod({
     name: 'github.readActionsArtifactChunk',

@@ -1,4 +1,5 @@
 {
+  "actions.artifacts.invalidChunk": "Invalid artifact download chunk",
   "sidebar": {
     "revealFiltered": {
       "title": "Reveal hidden workspace?",

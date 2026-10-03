@@ -34,16 +34,22 @@ export function registerGitHubActionsArtifactHandlers(store: Store): void {
     const query = ActionsArtifactDownloadQuery.parse(args)
     const repo = registeredActionsRepo(args, store)
     const lifetime = abortWhenRendererGone(event.sender)
+    let retained = false
     try {
-      return await startActionsArtifactDownload(
+      const transfer = await startActionsArtifactDownload(
         repo.path,
         query,
         getRepoSshConnectionId(repo),
         getGitHubLocalGitOptionArgs(store, repo)[0],
-        lifetime.signal
+        lifetime.signal,
+        lifetime.dispose
       )
+      retained = true
+      return transfer
     } finally {
-      lifetime.dispose()
+      if (!retained) {
+        lifetime.dispose()
+      }
     }
   })
   ipcMain.handle('gh:readActionsArtifactChunk', (_event, args: ActionsRequestContext) => {

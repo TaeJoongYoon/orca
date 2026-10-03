@@ -106,7 +106,8 @@ export class RuntimeGitHubReviewQueryCommands {
   async startRepoActionsArtifactDownload(
     selector: string,
     args: ActionsArtifactDownloadQuery,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onRelease?: () => void
   ) {
     const repo = await this.resolveActionsRepo(selector)
     return startActionsArtifactDownload(
@@ -114,7 +115,8 @@ export class RuntimeGitHubReviewQueryCommands {
       args,
       getRepoSshConnectionId(repo),
       this.deps.getLocalGitArgs(repo)[0],
-      signal
+      signal,
+      onRelease
     )
   }
   async readRepoActionsArtifactChunk(selector: string, args: ActionsArtifactTransferQuery) {

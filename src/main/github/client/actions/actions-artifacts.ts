@@ -4,7 +4,11 @@ import type {
   ActionsArtifactsQuery,
   ActionsArtifactDownloadQuery
 } from '../../../../shared/github/actions-artifact-types'
-import { ACTIONS_ARTIFACT_MAX_BYTES } from '../../../../shared/github/actions-artifact-types'
+import {
+  ACTIONS_ARTIFACT_MAX_BYTES,
+  ACTIONS_ARTIFACT_HOST_TIMEOUT_MS,
+  ACTIONS_ARTIFACT_TIMEOUT_MESSAGE
+} from '../../../../shared/github/actions-artifact-types'
 import {
   ActionsArtifactsQuery as ListSchema,
   ActionsArtifactDownloadQuery as DownloadSchema
@@ -77,7 +81,8 @@ export function startActionsArtifactDownload(
   query: ActionsArtifactDownloadQuery,
   connectionId?: string | null,
   localGitOptions: LocalGitExecOptions = {},
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onRelease?: () => void
 ) {
   const args = DownloadSchema.parse(query)
   return withActionsRead(
@@ -105,6 +110,7 @@ export function startActionsArtifactDownload(
       const { stdout } = await ghExecFileAsync(['api', `${endpoint}/zip`], {
         ...options,
         encoding: 'base64',
+        timeout: ACTIONS_ARTIFACT_HOST_TIMEOUT_MS,
         maxBuffer: ACTIONS_ARTIFACT_MAX_BYTES * 2
       })
       const archive = Buffer.from(stdout, 'base64')
@@ -119,11 +125,15 @@ export function startActionsArtifactDownload(
       ) {
         throw new Error('GitHub did not return a ZIP archive')
       }
+      options.signal?.throwIfAborted()
       return createArtifactSession(
         artifactSessionOwner(repoPath, connectionId, localGitOptions),
         archive,
-        `${sanitizeLocalDownloadFilename(artifact.name)}.zip`
+        `${sanitizeLocalDownloadFilename(artifact.name)}.zip`,
+        signal,
+        onRelease
       )
-    }
+    },
+    { timeoutMs: ACTIONS_ARTIFACT_HOST_TIMEOUT_MS, message: ACTIONS_ARTIFACT_TIMEOUT_MESSAGE }
   )
 }

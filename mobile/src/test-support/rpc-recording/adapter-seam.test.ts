@@ -1,9 +1,12 @@
 import { readFileSync, readdirSync } from 'node:fs'
-import { join, relative, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { operationModuleLoader } from './operation-module-loader'
 import { MOUNTED_OPERATION_MODULES } from './adapters/mounted-operation-modules'
 import {
   HOST_CLIENT_CONTEXT_LOCAL,
+  HOST_CLIENT_CONTEXT_MODULE,
+  loadHostClientContext,
   hostClientContextExposure
 } from './host-client-context-exposure'
 
@@ -21,24 +24,13 @@ describe('the adapter directory', () => {
     expect(present.sort()).toEqual([...sources].sort())
   })
 
-  it('keeps the host-client context exposure in one place, still anchored on the product source', () => {
-    // The exposure reaches for a module-private local by name, which no type checker follows: a
-    // rename lands as a `ReferenceError` several seconds into a recording. One copy, asserted
-    // against the declaration it names, turns that into one failure that says what moved.
-    const [, source] = hostClientContextExposure
-    const declaration = `const ${HOST_CLIENT_CONTEXT_LOCAL} = createContext`
-    const context = readFileSync(join(root, 'mobile/src/transport/client-context.tsx'), 'utf8')
-    expect(context.split(declaration).length - 1).toBe(1)
-    // Sources only, since the README quotes the string to document it.
-    const copies = [engine, directory]
-      .flatMap((from) =>
-        readdirSync(from, { withFileTypes: true })
-          .filter((entry) => entry.isFile() && /\.tsx?$/.test(entry.name))
-          .map((entry) => join(from, entry.name))
-      )
-      .filter((file) => readFileSync(file, 'utf8').includes(source.trim()))
-      .map((file) => relative(root, file))
-      .sort()
-    expect(copies).toEqual([])
+  it('loads the stable context export through the recording compiler', () => {
+    const context = readFileSync(join(root, HOST_CLIENT_CONTEXT_MODULE), 'utf8')
+    expect(context).toContain(`export const ${HOST_CLIENT_CONTEXT_LOCAL} = createContext`)
+    const modules = operationModuleLoader(root, undefined, [hostClientContextExposure])
+    const loaded = loadHostClientContext(modules)
+    expect(loaded.Provider).toBeTruthy()
+    expect(loadHostClientContext(modules)).toBe(loaded)
+    expect(modules.load(HOST_CLIENT_CONTEXT_MODULE)[HOST_CLIENT_CONTEXT_LOCAL]).toBe(loaded)
   })
 })

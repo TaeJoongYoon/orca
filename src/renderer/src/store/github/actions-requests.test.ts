@@ -3,6 +3,8 @@ import * as rpc from '@/runtime/runtime-rpc-client'
 import { RuntimeRpcCallError } from '@/runtime/runtime-rpc-result'
 import { createTestStore, TEST_REPO } from '../slices/store-test-helpers'
 import { fetchActionsRuns } from './actions-requests'
+import { startActionsArtifactDownload } from './actions-artifact-requests'
+import { ACTIONS_ARTIFACT_CLIENT_TIMEOUT_MS } from '../../../../shared/github/actions-artifact-types'
 import { actionsRepoProbeKey } from './actions-request-identity'
 import type { ActionsPage, ActionsRun } from '../../../../shared/github/actions-types'
 
@@ -21,6 +23,24 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 describe('Actions request ownership', () => {
+  it('allows a runtime-owned artifact to outlast the metadata request deadline', async () => {
+    const store = createTestStore()
+    store.setState({ repos: [{ ...TEST_REPO, executionHostId: 'runtime:owner' }] })
+    const call = vi
+      .spyOn(rpc, 'callRuntimeRpc')
+      .mockResolvedValue({ transferId: 'artifact', sizeBytes: 4, fileName: 'artifact.zip' })
+    await startActionsArtifactDownload(store.getState(), context, {
+      repository: page.repository,
+      runId: 1,
+      artifactId: 2
+    })
+    expect(call).toHaveBeenCalledWith(
+      { kind: 'environment', environmentId: 'owner' },
+      'github.startActionsArtifactDownload',
+      { repo: TEST_REPO.id, repository: page.repository, runId: 1, artifactId: 2 },
+      { timeoutMs: ACTIONS_ARTIFACT_CLIENT_TIMEOUT_MS }
+    )
+  })
   it('routes runtime-owned repos to their owner despite the active runtime focus', async () => {
     const store = createTestStore()
     store.setState({

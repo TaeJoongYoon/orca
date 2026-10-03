@@ -1,3 +1,4 @@
+import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
 import {
   startActionsArtifactDownload,
@@ -35,7 +36,9 @@ export async function downloadActionsArtifact(
         offset
       })
       if (chunk.nextOffset <= offset || chunk.nextOffset > remote.sizeBytes) {
-        throw new Error('Invalid artifact download chunk')
+        throw new Error(
+          translate('actions.artifacts.invalidChunk', 'Invalid artifact download chunk')
+        )
       }
       await window.api.fs.appendDownloadedFileChunk({
         transferId: local.transferId,

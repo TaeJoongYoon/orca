@@ -8,7 +8,11 @@ import {
   readArtifactSession,
   releaseArtifactSession
 } from './artifact-download-sessions'
-import { ACTIONS_ARTIFACT_MAX_BYTES } from '../../../../shared/github/actions-artifact-types'
+import {
+  ACTIONS_ARTIFACT_MAX_BYTES,
+  ACTIONS_ARTIFACT_HOST_TIMEOUT_MS,
+  ACTIONS_ARTIFACT_TIMEOUT_MESSAGE
+} from '../../../../shared/github/actions-artifact-types'
 const repository = { owner: 'acme', repo: 'widgets', host: 'github.enterprise.test' }
 const metadata = {
   id: 7,
@@ -34,9 +38,75 @@ beforeEach(() => {
   call.mockReset()
   vi.spyOn(gh, 'ghExecFileAsync').mockImplementation(call)
 })
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.useRealTimers()
+})
 const query = { repository, runId: 900, artifactId: 7 }
 describe('Actions artifacts', () => {
+  it('allows queued acquisition and a slow archive beyond the metadata deadline', async () => {
+    vi.useFakeTimers()
+    vi.mocked(gh.acquire).mockImplementation(
+      () => new Promise((resolve) => setTimeout(resolve, 30_000))
+    )
+    call
+      .mockResolvedValueOnce({ stdout: JSON.stringify(metadata), stderr: '' })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve({ stdout: zip.toString('base64'), stderr: '' }), 40_000)
+          )
+      )
+    const pending = startActionsArtifactDownload('/repo', query)
+    await vi.advanceTimersByTimeAsync(70_000)
+    const transfer = await pending
+    releaseArtifactSession(transfer.transferId, artifactSessionOwner('/repo'))
+    expect(call).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ timeout: ACTIONS_ARTIFACT_HOST_TIMEOUT_MS })
+    )
+    expect(gh.release).toHaveBeenCalledOnce()
+  })
+  it('aborts a stalled archive with its download-specific deadline and message', async () => {
+    vi.useFakeTimers()
+    let archiveSignal: AbortSignal | undefined
+    call
+      .mockResolvedValueOnce({ stdout: JSON.stringify(metadata), stderr: '' })
+      .mockImplementationOnce(
+        (_args, options) =>
+          new Promise((_resolve, reject) => {
+            archiveSignal = options?.signal
+            archiveSignal?.addEventListener('abort', () => reject(archiveSignal?.reason), {
+              once: true
+            })
+          })
+      )
+    const pending = startActionsArtifactDownload('/repo', query)
+    const rejected = expect(pending).rejects.toThrow(ACTIONS_ARTIFACT_TIMEOUT_MESSAGE)
+    await vi.advanceTimersByTimeAsync(ACTIONS_ARTIFACT_HOST_TIMEOUT_MS)
+    await rejected
+    expect(archiveSignal?.aborted).toBe(true)
+    expect(gh.release).toHaveBeenCalledOnce()
+  })
+  it('cancels archive acquisition when its caller goes away', async () => {
+    const controller = new AbortController()
+    call
+      .mockResolvedValueOnce({ stdout: JSON.stringify(metadata), stderr: '' })
+      .mockImplementationOnce(
+        (_args, options) =>
+          new Promise((_resolve, reject) => {
+            options?.signal?.addEventListener('abort', () => reject(options.signal?.reason), {
+              once: true
+            })
+          })
+      )
+    const pending = startActionsArtifactDownload('/repo', query, null, {}, controller.signal)
+    const rejected = expect(pending).rejects.toThrow('Caller disconnected')
+    await vi.waitFor(() => expect(call).toHaveBeenCalledTimes(2))
+    controller.abort(new Error('Caller disconnected'))
+    await rejected
+    expect(gh.release).toHaveBeenCalledOnce()
+  })
   it('lists a bounded page with metadata and pagination', async () => {
     call.mockResolvedValue({
       stdout: JSON.stringify({ artifacts: [metadata], total_count: 1001 }),

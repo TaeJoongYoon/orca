@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, renderHook } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useActionsRuns } from './use-actions-runs'
 import { useActionsRepositories } from './use-actions-repositories'
@@ -9,6 +9,7 @@ import { TEST_REPO } from '@/store/slices/store-test-helpers'
 import { makeWorktree, makeFolderWorkspace } from '@/store/slices/worktrees-slice-test-fixtures'
 import type { ActionsPage, ActionsRun } from '../../../../shared/github/actions-types'
 import { actionsCandidateRepos } from './actions-repositories'
+import { ActionsFilters } from '../task-page/github/actions/ActionsFilters'
 
 const repository = { owner: 'acme', repo: 'widgets', host: 'github.com' }
 const option = { repo: TEST_REPO, repository }
@@ -59,7 +60,7 @@ describe('Actions panel generations and registered repositories', () => {
     )
   })
   it('retries a failed workflow page without skipping it or erasing successful runs', async () => {
-    vi.spyOn(requests, 'fetchActionsRuns').mockResolvedValue(page)
+    const runs = vi.spyOn(requests, 'fetchActionsRuns').mockResolvedValue(page)
     const workflows = vi
       .spyOn(requests, 'fetchActionsWorkflows')
       .mockResolvedValueOnce({
@@ -75,14 +76,19 @@ describe('Actions panel generations and registered repositories', () => {
       })
     const { result } = renderHook(() => useActionsRuns(option))
     await settle()
+    await act(async () => result.current.setQuery({ branch: 'release', page: 3 }))
     await act(async () => result.current.moreWorkflows())
     await settle()
     expect(result.current.workflows.error).toBe('page failed')
     expect(result.current.data).toEqual(page)
-    await act(async () => result.current.moreWorkflows())
+    render(<ActionsFilters model={result.current} option={option} />)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Retry workflows' })))
     await settle()
     expect(workflows.mock.calls.map((call) => call[2].page)).toEqual([1, 2, 2])
     expect(result.current.workflows.items.map((workflow) => workflow.id)).toEqual([1, 2])
+    expect(result.current.query).toEqual({ branch: 'release', page: 3 })
+    expect(runs).toHaveBeenCalledTimes(2)
+    expect(workflows.mock.calls.every((call) => !call[2].noCache)).toBe(true)
   })
   it('does not refetch discovery after unrelated worktree metadata changes', async () => {
     const repo = { ...TEST_REPO, id: 'stable-probe-repo' }
