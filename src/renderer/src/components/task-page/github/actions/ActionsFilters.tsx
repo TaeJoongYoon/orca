@@ -17,6 +17,7 @@ import { ACTIONS_STATUSES } from '../../../../../../shared/github/actions-types'
 import { actionsRepositoryUrl } from '../../../../../../shared/github/actions-web-url'
 import { translate } from '@/i18n/i18n'
 
+/** Apply run filters and retry only the failed workflow page, preserving run paging and loaded workflows. */
 export function ActionsFilters({
   model,
   option

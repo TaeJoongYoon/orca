@@ -43,6 +43,7 @@ type RuntimeGitHubReviewQueryCommandsDeps = {
 export class RuntimeGitHubReviewQueryCommands {
   constructor(private readonly deps: RuntimeGitHubReviewQueryCommandsDeps) {}
 
+  /** Resolve an execution-host repository selector and reject folder-only workspaces for GitHub Actions. */
   private async resolveActionsRepo(selector: string): Promise<Repo> {
     const repo = await this.deps.resolveRepo(selector)
     if (isFolderRepo(repo)) {
@@ -50,6 +51,7 @@ export class RuntimeGitHubReviewQueryCommands {
     }
     return repo
   }
+  /** Read runs with the resolved repository’s SSH/WSL route and the caller’s cancellation signal. */
   async getRepoActionsRuns(selector: string, args: ActionsRunsQuery, signal?: AbortSignal) {
     const repo = await this.resolveActionsRepo(selector)
     return listActionsRuns(
@@ -60,6 +62,7 @@ export class RuntimeGitHubReviewQueryCommands {
       signal
     )
   }
+  /** Read workflow pages with the resolved repository’s account and execution route. */
   async getRepoActionsWorkflows(
     selector: string,
     args: ActionsWorkflowsQuery,
@@ -74,6 +77,7 @@ export class RuntimeGitHubReviewQueryCommands {
       signal
     )
   }
+  /** Read attempt-specific jobs using the resolved repository’s route, preserving caller cancellation. */
   async getRepoActionsRunDetails(
     selector: string,
     args: ActionsDetailsQuery,
@@ -89,6 +93,7 @@ export class RuntimeGitHubReviewQueryCommands {
     )
   }
 
+  /** List artifacts on the resolved Git repository’s execution route rather than the active UI host. */
   async getRepoActionsArtifacts(
     selector: string,
     args: ActionsArtifactsQuery,
@@ -103,6 +108,7 @@ export class RuntimeGitHubReviewQueryCommands {
       signal
     )
   }
+  /** Acquire an owner-bound archive while retaining the caller lifetime beyond the initiating request. */
   async startRepoActionsArtifactDownload(
     selector: string,
     args: ActionsArtifactDownloadQuery,
@@ -119,6 +125,7 @@ export class RuntimeGitHubReviewQueryCommands {
       onRelease
     )
   }
+  /** Recompute the repository/host/account owner before reading a retained transfer chunk. */
   async readRepoActionsArtifactChunk(selector: string, args: ActionsArtifactTransferQuery) {
     const repo = await this.resolveActionsRepo(selector)
     return readArtifactSession(
@@ -131,6 +138,7 @@ export class RuntimeGitHubReviewQueryCommands {
       args.offset ?? 0
     )
   }
+  /** Recompute transfer ownership before releasing bytes and retained caller-lifetime listeners. */
   async releaseRepoActionsArtifactDownload(selector: string, args: ActionsArtifactTransferQuery) {
     const repo = await this.resolveActionsRepo(selector)
     releaseArtifactSession(

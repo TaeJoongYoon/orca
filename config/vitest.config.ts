@@ -17,7 +17,6 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    globalSetup: [resolve('config/scripts/prepare-mobile-generated-inputs.ts')],
     ...(process.env.ORCA_BALANCE_UNIT_SHARDS === '1'
       ? {
           sequence: { sequencer: TimingSequencer },

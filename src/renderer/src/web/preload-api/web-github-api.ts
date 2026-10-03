@@ -14,6 +14,7 @@ export type WebGitHubApi = NonNullable<PreloadApi['gh']>
 
 export type WebGitHubResult<K extends keyof WebGitHubApi> = Awaited<ReturnType<WebGitHubApi[K]>>
 
+/** Expose the same GitHub/Actions API surface to web clients through authenticated runtime RPC. */
 export function createGitHubApi(): WebGitHubApi {
   const route = <Result>(method: WebGitHubRuntimeMethod, args?: unknown): Promise<Result> =>
     callRuntimeResult<Result>(method, mapRepoPathArg(args))

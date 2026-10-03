@@ -1,4 +1,4 @@
-import { getMeasuredCellHeight, getTotalScale } from './cell-metrics'
+import { getMeasuredCellHeight, getTotalScale } from './viewport-transform'
 import { notify } from './host-notify'
 import type {
   TerminalDocumentCell,

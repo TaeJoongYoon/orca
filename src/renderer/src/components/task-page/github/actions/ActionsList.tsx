@@ -13,6 +13,7 @@ import {
 } from '@/components/task-page-source-context'
 
 const grid = 'grid-cols-[88px_minmax(260px,1fr)_140px_140px_100px]'
+/** Show bounded run paging with explicit loading, retry, empty and truncation states. */
 export function ActionsList({
   model,
   onOpen

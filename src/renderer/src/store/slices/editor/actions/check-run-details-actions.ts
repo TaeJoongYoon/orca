@@ -17,6 +17,7 @@ import { findWorktreeById, getRepoIdFromWorktreeId } from '../../worktree-helper
 import type { OpenFile } from '../types/open-file'
 import { openWorkspaceEditorItem } from '../tabs/workspace-editor-item'
 
+/** Keep Actions detail tabs on their owner-bound loader while retaining existing GitHub and GitLab check paths. */
 export function createCheckRunDetailsActions(
   set: EditorSet,
   get: EditorGet
@@ -156,6 +157,7 @@ export function createCheckRunDetailsActions(
       }
       const { contextKey, check } = checkRunDetails
       const requestId = createCheckRunDetailsRequestId()
+      /** Apply detail results with this request ID so a slower generation cannot overwrite a newer tab state. */
       const patch = (next: CheckRunDetailsTabPatch): void => {
         get().patchOpenCheckRunDetails(file.worktreeId, contextKey, check, { ...next, requestId })
       }

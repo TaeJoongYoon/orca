@@ -11,6 +11,7 @@ import { registerGitHubWorkItemHandlers } from './github-work-item-handlers'
 
 import { registerGitHubActionsReadHandlers } from './github-actions-read-handlers'
 
+/** Compose GitHub IPC handlers around the same store so Actions shares existing repository/account routing. */
 export function registerGitHubHandlers(store: Store, stats: StatsCollector): void {
   registerGitHubActionsReadHandlers(store)
   registerGitHubPRRefreshHandlers(store, stats)

@@ -12,6 +12,7 @@ import { actionsRepoProbeKey } from './actions-repositories'
 
 const DEFAULT_QUERY: ActionsRunsQuery = { page: 1 }
 
+/** Keep run filters and workflow pagination independent; ignore stale reads and retry failed workflow pages in place. */
 export function useActionsRuns(option: ActionsRepositoryOption | undefined) {
   const [queryState, setQuery] = useState<{ identity: string; query: ActionsRunsQuery }>({
     identity: '',

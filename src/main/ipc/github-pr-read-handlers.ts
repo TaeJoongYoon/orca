@@ -19,6 +19,7 @@ import {
   getGitHubRepoConnectionId
 } from './github-repo-routing'
 
+/** Register PR and Actions reads using the existing account-aware repository routing boundary. */
 export function registerGitHubPRReadHandlers(store: Store): void {
   ipcMain.handle(
     'gh:repoSlug',

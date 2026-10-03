@@ -1,5 +1,6 @@
 export type ActionsStatusTone = 'success' | 'failure' | 'running' | 'waiting' | 'neutral'
 
+/** Map known GitHub states to semantic color roles and keep unfamiliar states neutral. */
 export function actionsStatusTone(status: string | null | undefined): ActionsStatusTone {
   switch (status) {
     case 'success':

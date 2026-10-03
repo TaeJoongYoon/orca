@@ -7,6 +7,7 @@ import { TaskPageGitHubList } from './github/List'
 import { TaskPageGitLabTodoList } from './gitlab/TodoList'
 import { TaskPageGitLabItemList } from './gitlab/ItemList'
 import { TaskPageJiraContent } from './jira/Content'
+/** Route the GitHub Actions mode separately from item lists and project views. */
 export function TaskPageContent({
   model
 }: {

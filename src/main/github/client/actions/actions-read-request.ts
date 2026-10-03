@@ -12,6 +12,7 @@ import {
   GITHUB_CHECK_DETAILS_TIMEOUT_MESSAGE
 } from '../../../../shared/github/check-details-deadline'
 
+/** Resolve the GitHub account and execution route, enforce a deadline including queue time, and release the read slot. */
 export async function withActionsRead<T>(
   repoPath: string,
   repository: GitHubApiRepository | undefined,
@@ -68,6 +69,7 @@ export async function withActionsRead<T>(
     }
   }
 }
+/** Parse a GitHub API response using the caller’s account, execution route and abort signal. */
 export async function actionsJson(endpoint: string, options: GhExecOptions): Promise<unknown> {
   const { stdout } = await ghExecFileAsync(['api', endpoint], options)
   return JSON.parse(stdout)

@@ -11,6 +11,7 @@ import { attachFailedJobLogTails } from '../check/check-job-log-tails'
 import { rethrowCheckDetailsAbort } from '../check/check-details-abort'
 import { resolveCommand } from '../../../git/command-runner/wsl-command-resolution'
 
+/** Read the latest attempt’s jobs and bounded log excerpts; preserve run metadata when job reads fail. */
 export function getWorkflowRunDetails(
   repoPath: string,
   query: ActionsDetailsQuery,

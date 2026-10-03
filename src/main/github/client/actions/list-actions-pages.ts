@@ -22,6 +22,7 @@ import {
   mapActionsWorkflow
 } from './workflow-run-field-mapping'
 
+/** Read a filtered run page on the resolved GitHub execution route, stopping at the supported page ceiling. */
 export function listActionsRuns(
   repoPath: string,
   query: ActionsRunsQuery,
@@ -72,6 +73,7 @@ export function listActionsRuns(
     }
   )
 }
+/** Read one workflow page and report truncation when GitHub has more data beyond the ten-page ceiling. */
 export function listActionsWorkflows(
   repoPath: string,
   query: ActionsWorkflowsQuery,

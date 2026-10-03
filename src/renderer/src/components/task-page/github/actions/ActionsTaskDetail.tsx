@@ -8,6 +8,7 @@ import type { OpenFile } from '@/store/slices/editor/types/open-file'
 import type { ActionsRun } from '../../../../../../shared/github/actions-types'
 import { useAppStore } from '@/store'
 
+/** Fence detail reads by run and owner; append jobs only when the workflow attempt still matches. */
 export function ActionsTaskDetail({
   option,
   run,

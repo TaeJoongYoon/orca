@@ -58,6 +58,7 @@ export class RpcDispatcher {
     })
   }
 
+  /** Validate and execute a unary RPC with caller identity and retained connection lifetime in its context. */
   async dispatch(request: RpcRequest, options?: DispatchCallOptions): Promise<RpcResponse> {
     const meta = this.meta()
     const method = this.registry.get(request.method)

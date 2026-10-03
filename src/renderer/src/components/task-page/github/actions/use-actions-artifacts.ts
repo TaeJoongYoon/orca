@@ -6,6 +6,7 @@ import type { ActionsRepositoryOption } from '@/components/right-sidebar/use-act
 import type { ActionsPage } from '../../../../../../shared/github/actions-types'
 import type { ActionsArtifact } from '../../../../../../shared/github/actions-artifact-types'
 import { downloadActionsArtifact } from './download-actions-artifact'
+/** Fence paginated artifact reads and coordinate one cancelable save without treating intentional cancel as an error. */
 export function useActionsArtifacts(option: ActionsRepositoryOption, runId: number) {
   const [state, setState] = useState<{
     data: ActionsPage<ActionsArtifact> | null
@@ -69,6 +70,7 @@ export function useActionsArtifacts(option: ActionsRepositoryOption, runId: numb
       generation.current += 1
     }
   }, [read])
+  /** Serialize saves for this view and suppress completion updates after unmount or intentional cancellation. */
   const save = async (artifact: ActionsArtifact) => {
     if (download.id !== null) {
       return

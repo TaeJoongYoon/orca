@@ -9,7 +9,6 @@ export default defineConfig({
   oxc: vitestOxcConfig,
   test: {
     environment: 'node',
-    globalSetup: ['../config/scripts/prepare-mobile-generated-inputs.ts'],
     setupFiles: ['./vitest.setup.ts'],
     onConsoleLog: (log) => !log.includes('react-test-renderer is deprecated'),
     // .tsx too: component tests exist (react-test-renderer + mocked react-native) and were

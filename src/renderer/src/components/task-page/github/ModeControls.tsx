@@ -7,6 +7,7 @@ import { translate } from '@/i18n/i18n'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { ExternalLink } from 'lucide-react'
+/** Expose Actions alongside existing GitHub modes without adding it to cross-client page-resume state. */
 export function TaskPageGitHubModeControls({
   model
 }: {

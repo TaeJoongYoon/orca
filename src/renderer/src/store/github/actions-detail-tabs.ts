@@ -15,6 +15,7 @@ import { fetchActionsRunDetails } from './actions-requests'
 import { githubRepoIdentityKey } from '../../../../shared/github/repository-identity-key'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 
+/** Open a run tab pinned to repository, host and account so later focus changes cannot retarget reads. */
 export function openActionsRun(
   state: AppState,
   worktreeId: string,
@@ -53,6 +54,7 @@ export function openActionsRun(
   void state.reloadOpenCheckRunDetailsTab(buildCheckRunDetailsTabId(worktreeId, check))
 }
 
+/** Fence refresh generations and append job pages only within the same attempt and repository owner. */
 export async function loadActionsDetailTab(
   get: () => AppState,
   fileId: string,
@@ -74,6 +76,7 @@ export async function loadActionsDetailTab(
     return
   }
   const requestId = createCheckRunDetailsRequestId()
+  /** Apply detail results with this request ID so a slower generation cannot overwrite a newer tab state. */
   const patch = (
     details: ActionsRunDetails | null,
     loading: boolean,

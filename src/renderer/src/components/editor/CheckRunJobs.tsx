@@ -26,6 +26,7 @@ function StepOutcomeIcon({ outcome }: { outcome: StepOutcome }): React.JSX.Eleme
   }
 }
 
+/** Apply Actions status colors only when requested, leaving existing check-step presentation intact. */
 function StepRow({
   step,
   actionsStatusColors
@@ -62,6 +63,7 @@ function StepRow({
   )
 }
 
+/** Prioritize failed steps and retain expandable passing steps, with Actions styling enabled by the caller. */
 function JobCard({
   job,
   jobLinkLabel,
@@ -190,6 +192,7 @@ function JobCard({
   )
 }
 
+/** Reuse check-job rendering for Actions without changing the default presentation of other providers. */
 export function CheckRunJobs({
   jobs,
   hasFailedJobs,

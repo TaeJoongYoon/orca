@@ -5,6 +5,7 @@ import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { isFolderRepo } from '../../../../shared/repo-kind'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 
+/** Find registered Git repositories for worktree or folder scope, deduplicated by execution host and path. */
 export function actionsCandidateRepos(state: AppState, workspaceId: string | null): Repo[] {
   if (!workspaceId) {
     return []

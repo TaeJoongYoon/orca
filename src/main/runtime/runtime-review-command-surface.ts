@@ -57,6 +57,7 @@ type RuntimeReviewCommandOwners = {
   gitHubProjects: RuntimeGitHubProjectCommands
 }
 
+/** Bind review command services onto the runtime while preserving their method receivers. */
 export function installRuntimeReviewCommandSurface(
   target: RuntimeReviewCommandSurface,
   owners: RuntimeReviewCommandOwners

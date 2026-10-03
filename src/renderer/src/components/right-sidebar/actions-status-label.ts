@@ -1,4 +1,5 @@
 import { translate } from '@/i18n/i18n'
+/** Translate known GitHub statuses while retaining unfamiliar host statuses as visible text. */
 export function actionsStatusLabel(status: string | null): string {
   if (status === null) {
     return translate('actions.statusUnknown', 'Unknown')

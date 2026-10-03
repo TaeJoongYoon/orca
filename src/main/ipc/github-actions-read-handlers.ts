@@ -17,6 +17,7 @@ import { listActionsRuns, listActionsWorkflows, getWorkflowRunDetails } from '..
 import type { Store } from '../persistence'
 import { getGitHubLocalGitOptionArgs } from './github-repo-routing'
 
+/** Validate desktop Actions requests against registered Git repositories before dispatching reads. */
 export function registerGitHubActionsReadHandlers(store: Store): void {
   registerGitHubActionsArtifactHandlers(store)
   ipcMain.handle('gh:actionsRuns', (_event, args: ActionsRequestContext & ActionsRunsQuery) => {

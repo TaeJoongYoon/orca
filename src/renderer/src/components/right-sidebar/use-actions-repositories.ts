@@ -16,6 +16,7 @@ const probes = new Map<
   }
 >()
 
+/** Probe registered repository identities with account/host-scoped caching and discard stale generations. */
 export function useActionsRepositories(
   workspaceId: string | null,
   selectedRepoIds?: ReadonlySet<string>

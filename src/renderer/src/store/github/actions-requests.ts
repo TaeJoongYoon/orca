@@ -34,6 +34,7 @@ type ActionsQuery =
 const runsInflight = new Map<string, Promise<ActionsPage<ActionsRun>>>()
 const workflowsInflight = new Map<string, Promise<ActionsPage<ActionsWorkflow>>>()
 const detailsInflight = new Map<string, Promise<ActionsRunDetails>>()
+/** Share only identical in-flight reads; bound tracking without canceling evicted requests. */
 function shareActionsRequest<T>(
   requests: Map<string, Promise<T>>,
   key: string,
@@ -57,6 +58,7 @@ function shareActionsRequest<T>(
   }
   return promise
 }
+/** Include owner, request context, query and dispatch route when identifying shareable reads. */
 function actionsRequestKey(
   state: AppState,
   context: ActionsRequestContext,
@@ -70,6 +72,7 @@ function actionsRequestKey(
     route(state, context)
   ])
 }
+/** Validate repository registration and pinned ownership before choosing its account-aware local or runtime route. */
 function route(state: AppState, context: ActionsRequestContext) {
   const repo = state.repos.find((entry) => entry.id === context.repoId)
   if (!repo || repo.path !== context.repoPath) {
@@ -95,6 +98,7 @@ function route(state: AppState, context: ActionsRequestContext) {
     ? { ...target, runtimeRepoId: context.sourceContext?.repoId ?? repo.id }
     : target
 }
+/** Dispatch to the registered execution owner; report unsupported old hosts without silently falling back locally. */
 export async function requestActions<T>(
   state: AppState,
   context: ActionsRequestContext,
@@ -129,6 +133,7 @@ export async function requestActions<T>(
     throw error
   }
 }
+/** Require a verified SSH origin probe when resolving a registered repository’s GitHub identity. */
 export async function fetchActionsRepository(
   state: AppState,
   context: ActionsRequestContext
@@ -138,6 +143,7 @@ export async function fetchActionsRepository(
     window.api.gh.repoSlug({ ...context, ...args })
   )
 }
+/** Share matching in-flight run reads unless an explicit refresh requests fresh data. */
 export async function fetchActionsRuns(
   state: AppState,
   context: ActionsRequestContext,
@@ -151,6 +157,7 @@ export async function fetchActionsRuns(
     ? read()
     : shareActionsRequest(runsInflight, actionsRequestKey(state, context, args), read)
 }
+/** Share matching in-flight workflow pages without conflating different hosts, accounts or filters. */
 export async function fetchActionsWorkflows(
   state: AppState,
   context: ActionsRequestContext,
@@ -164,6 +171,7 @@ export async function fetchActionsWorkflows(
     ? read()
     : shareActionsRequest(workflowsInflight, actionsRequestKey(state, context, args), read)
 }
+/** Share matching attempt/page detail reads while allowing explicit refresh to bypass request sharing. */
 export async function fetchActionsRunDetails(
   state: AppState,
   context: ActionsRequestContext,

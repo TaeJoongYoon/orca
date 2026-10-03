@@ -10,6 +10,7 @@ import {
   CommandItem
 } from '@/components/ui/command'
 import { translate } from '@/i18n/i18n'
+/** Offer keyboard-searchable choices and close the popover after forwarding the selected stable value. */
 export function ActionsChoice({
   value,
   options,

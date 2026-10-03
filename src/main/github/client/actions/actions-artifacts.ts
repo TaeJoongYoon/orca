@@ -19,6 +19,7 @@ import { actionsJson, withActionsRead } from './actions-read-request'
 import { actionsCount, actionsNumber, actionsRecord } from './workflow-run-field-mapping'
 import { nullableString } from '../check/check-detail-field-mapping'
 import { artifactSessionOwner, createArtifactSession } from './artifact-download-sessions'
+/** Reject malformed sizes and expiry flags before exposing artifact metadata to download callers. */
 function mapArtifact(value: unknown): ActionsArtifact {
   const row = actionsRecord(value)
   const sizeBytes = actionsCount(row.size_in_bytes)
@@ -36,6 +37,7 @@ function mapArtifact(value: unknown): ActionsArtifact {
     expiresAt: nullableString(row.expires_at)
   }
 }
+/** Read one bounded artifact page from the explicit GitHub target using the execution account. */
 export function listActionsArtifacts(
   repoPath: string,
   query: ActionsArtifactsQuery,
@@ -76,6 +78,7 @@ export function listActionsArtifacts(
     }
   )
 }
+/** Verify artifact/run ownership, expiry, size and ZIP signature, then retain bytes until release or caller loss. */
 export function startActionsArtifactDownload(
   repoPath: string,
   query: ActionsArtifactDownloadQuery,

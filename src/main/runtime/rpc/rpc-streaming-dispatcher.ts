@@ -39,6 +39,7 @@ export class RpcStreamingDispatcher {
   constructor(private readonly dependencies: RpcStreamingDispatcherDependencies) {}
 
   // Why: streaming dispatch sends multiple responses through the reply callback instead of a Promise.
+  /** Dispatch unary or streaming handlers with the authenticated caller’s identity and disconnect lifetime. */
   async dispatch(
     rawRequest: RpcRequest,
     reply: (response: string) => void,

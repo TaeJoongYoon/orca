@@ -10,6 +10,7 @@ import { ActionsList } from './ActionsList'
 import { ActionsTaskDetail } from './ActionsTaskDetail'
 import type { ActionsRun } from '../../../../../../shared/github/actions-types'
 
+/** Require a verified registered GitHub repository before exposing run browsing and download controls. */
 export function TaskPageActions({ selectedRepoIds }: { selectedRepoIds: ReadonlySet<string> }) {
   const repositories = useActionsRepositories(null, selectedRepoIds)
   const [repoId, setRepoId] = useState('')
@@ -63,6 +64,7 @@ export function TaskPageActions({ selectedRepoIds }: { selectedRepoIds: Readonly
   )
 }
 
+/** Reset run selection when repository ownership changes while keeping list/detail navigation local to Tasks. */
 function ActionsRepositoryPage({
   option
 }: {

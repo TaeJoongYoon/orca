@@ -12,6 +12,7 @@ import { ArrowLeft } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { actionsRepositoryUrl, actionsUrl } from '../../../../shared/github/actions-web-url'
 
+/** Reload editor-tab details through the request-generation fence used by other check-detail tabs. */
 export function ActionsRunDetailsPanel({ file }: { file: OpenFile }): React.JSX.Element {
   return (
     <ActionsRunDetailsContent
@@ -26,6 +27,7 @@ export function ActionsRunDetailsPanel({ file }: { file: OpenFile }): React.JSX.
   )
 }
 
+/** Share the run/job view between Tasks and editor tabs, retaining prior data during refreshes. */
 export function ActionsRunDetailsContent({
   state,
   refresh,
@@ -45,6 +47,7 @@ export function ActionsRunDetailsContent({
   const duration = actionsDurationSeconds(details)
   const workflowFile = metadata?.run.workflowPath?.split('@')[0].split('/').at(-1)
   const run = metadata?.run
+  /** Open only credential-free HTTP(S) URLs accepted by the shared Actions URL validator. */
   const open = (url: string | null): void => {
     if (actionsUrl(url)) {
       void window.api.shell.openUrl(url!)

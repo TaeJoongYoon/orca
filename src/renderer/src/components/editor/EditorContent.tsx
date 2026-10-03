@@ -37,6 +37,7 @@ export function getMarkdownSourceLineOffset(frontMatterRaw: string): number {
   return offset
 }
 
+/** Choose Actions details only for tabs carrying Actions context; preserve the existing editor-kind dispatch. */
 export function EditorContent({
   activeFile,
   viewStateScopeId,

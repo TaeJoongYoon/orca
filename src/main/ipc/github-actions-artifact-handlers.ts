@@ -19,6 +19,7 @@ import {
   releaseArtifactSession
 } from '../github/client/actions/artifact-download-sessions'
 import { abortWhenRendererGone } from './renderer-lifetime-abort'
+/** Register owner-checked chunk transfers and retain renderer cleanup until the archive session ends. */
 export function registerGitHubActionsArtifactHandlers(store: Store): void {
   ipcMain.handle('gh:actionsArtifacts', (_event, args: ActionsRequestContext) => {
     const query = ActionsArtifactsQuery.parse(args)

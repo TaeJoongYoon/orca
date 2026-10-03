@@ -46,6 +46,7 @@ export function getCheckJobLogTailCacheKey(job: PRCheckRunDetails['jobs'][number
   return `${job.id}:${job.completedAt ?? ''}`
 }
 
+/** Attach bounded failure excerpts with owner-aware caching; ordinary read failures become optional warnings. */
 export async function attachFailedJobLogTails(
   jobs: PRCheckRunDetails['jobs'],
   ownerRepo: GitHubApiRepository,

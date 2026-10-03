@@ -1,4 +1,3 @@
-import { RpcClientContext as Ctx } from './rpc-client-context'
 // Web sibling: RN Web has no pairing keychain and no websocket transport of its own, so the page's
 // client is the shell bridge. Nothing here dials, retries or pairs — the native client on the other
 // side of the bridge already did, and this provider only carries what it holds across the boundary.
@@ -17,7 +16,7 @@ export {
   useRefreshHostClient
 } from './host-client-hooks'
 
-export { useRpcClientContext } from './rpc-client-context'
+const Ctx = createContext<RpcClientContextValue | null>(null)
 /** The page's own client, which is more than an `RpcClient`: the route seam reads the session off
  *  it to decide which screens are this document's. Separate from `Ctx` so the shared contract above
  *  stays the one every screen sees, page or native. */
@@ -107,4 +106,12 @@ export function usePageBridgeClient(): BridgeRpcClient {
     throw new Error('usePageBridgeClient must be used within RpcClientProvider')
   }
   return client
+}
+
+export function useRpcClientContext(): RpcClientContextValue {
+  const value = useContext(Ctx)
+  if (!value) {
+    throw new Error('useRpcClientContext must be used within RpcClientProvider')
+  }
+  return value
 }

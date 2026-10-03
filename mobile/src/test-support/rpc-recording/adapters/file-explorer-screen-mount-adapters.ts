@@ -9,7 +9,11 @@ import type { RpcClientContextValue } from '../../../transport/rpc-client-contex
 const HOST = 'host-1'
 const WORKTREE = 'wt-files'
 
-// Mount the real acquire/subscribe/release cycle over a scripted client using the shared context.
+/**
+ * The panel reads its client through the shared host-client context, whose handle is module-private
+ * in `client-context.tsx`. Exposing it mounts the real `useHostClient` — acquire, subscribe,
+ * release — over a scripted client, instead of reconstructing the hook against a prop.
+ */
 export const fileExplorerScreenMountExposures: readonly OperationExposure[] = [
   hostClientContextExposure
 ]

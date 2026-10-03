@@ -5,6 +5,7 @@ const sessions = new Map<
   string,
   { owner: string; archive: Buffer; timer: ReturnType<typeof setTimeout>; dispose: () => void }
 >()
+/** Bind transfer continuation to the repository path, SSH/WSL host and configured GitHub account. */
 export function artifactSessionOwner(
   repoPath: string,
   connectionId?: string | null,
@@ -17,6 +18,7 @@ export function artifactSessionOwner(
     options.ghAccount ?? null
   ])
 }
+/** Release only an owner-matching transfer; repeated cleanup leaves already released sessions untouched. */
 export function releaseArtifactSession(transferId: string, owner: string): void {
   const session = sessions.get(transferId)
   if (!session) {
@@ -29,6 +31,7 @@ export function releaseArtifactSession(transferId: string, owner: string): void 
   sessions.delete(transferId)
   session.dispose()
 }
+/** Retain archive bytes under the global two-session cap until explicit release, caller loss or five-minute expiry. */
 export function createArtifactSession(
   owner: string,
   archive: Buffer,
@@ -56,6 +59,7 @@ export function createArtifactSession(
   signal?.addEventListener('abort', abort, { once: true })
   return { transferId, sizeBytes: archive.length, fileName }
 }
+/** Reject foreign or expired transfers and return a bounded chunk at the requested validated byte offset. */
 export function readArtifactSession(transferId: string, owner: string, offset: number) {
   const session = sessions.get(transferId)
   if (!session || session.owner !== owner) {

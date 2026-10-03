@@ -6,6 +6,7 @@ import { formatBytes } from '@/components/status-bar/workspace-space-format'
 import type { ActionsRepositoryOption } from '@/components/right-sidebar/use-actions-repositories'
 import { ACTIONS_ARTIFACT_MAX_BYTES } from '../../../../../../shared/github/actions-artifact-types'
 import { useActionsArtifacts } from './use-actions-artifacts'
+/** Show artifact availability and save progress while keeping canceled transfers neutral and retriable failures visible. */
 export function ActionsArtifacts({
   option,
   runId

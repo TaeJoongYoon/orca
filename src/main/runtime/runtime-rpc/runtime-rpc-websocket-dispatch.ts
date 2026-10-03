@@ -28,6 +28,7 @@ function injectDeviceScope(response: string, scope: DeviceScope): string {
 
 export class RuntimeRpcWebSocketDispatch extends RuntimeRpcRequestAdmission {
   // Why: WebSocket dispatch is streaming (multiple responses) and auths via per-device tokens, not the shared token.
+  /** Authenticate and admit a socket request, preserving disconnect cancellation across dispatched handlers. */
   protected async handleWebSocketMessage(
     rawMessage: string,
     reply: (response: string) => void,

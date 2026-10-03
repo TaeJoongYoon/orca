@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 import { actionsStatusLabel } from './actions-status-label'
 import { actionsStatusTone, ACTIONS_STATUS_TEXT_CLASSES } from './actions-status-tone'
 
+/** Pair localized status text with semantic colors and accessible labels when only an icon is shown. */
 export function ActionsStatus({
   status,
   pill = false,

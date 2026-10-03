@@ -5,6 +5,7 @@ import type { GitLabTaskFilter, GitLabIssueFilter } from '@/components/task-page
 import type { GitLabWorkItem, GitLabTodo } from '../../../shared/gitlab-types'
 import { getRepoBackedTaskEmptyState } from '@/components/task-page-empty-state'
 import { isGitLabIssueFilter, isGitLabMRFilter } from './task-page-source-context'
+/** Keep Actions as a local GitHub mode while preserving provider selection and resume policy. */
 export function useTaskPageProviderState(model: TaskPageSourceAvailabilityModel) {
   const {
     settings,

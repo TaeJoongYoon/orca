@@ -1,4 +1,5 @@
 import type { PRCheckRunDetails } from './check-types'
+/** Return elapsed seconds only for valid, ordered timestamps; missing or invalid timing remains unknown. */
 export function completedDurationSeconds(
   startedAt: string | null,
   completedAt: string | null
@@ -9,6 +10,7 @@ export function completedDurationSeconds(
   const duration = (Date.parse(completedAt) - Date.parse(startedAt)) / 1000
   return Number.isFinite(duration) && duration >= 0 ? duration : null
 }
+/** Expose run duration only after every job page is available for a completed attempt. */
 export function actionsDurationSeconds(
   details: PRCheckRunDetails | null | undefined
 ): number | null {
