@@ -59,7 +59,10 @@ export async function withActionsRead<T>(
         `GitHub rate limit is low; retry after ${new Date(guard.resetAt * 1000).toISOString()}`
       )
     }
-    await acquire(controller.signal)
+    await acquire(controller.signal).catch((error: unknown) => {
+      controller.signal.throwIfAborted()
+      throw error
+    })
     acquired = true
     return await waitForCheckDetailsResolution(read(resolved.ownerRepo, options), controller.signal)
   } finally {
