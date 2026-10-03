@@ -129,6 +129,7 @@ export class RpcStreamingDispatcher {
           (needsLocalCallerFingerprint(request, effectiveParams)
             ? orchestrationMutations.getLocalAuthenticatedCallerFingerprint()
             : undefined)
+        /** Revalidate legacy authority and pass the authenticated caller and connection lifetime to the selected handler. */
         const invoke = (mutation?: DurableMutationInvocation) => {
           const legacyCoordinatorRunId = legacyCoordinator?.revalidate()
           return method.handler(effectiveParams, {

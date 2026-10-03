@@ -127,6 +127,7 @@ export function useActionsRuns(option: ActionsRepositoryOption | undefined) {
   }, [identity, option, workflowPage, workflowRetry, nonce])
   return {
     query,
+    /** Bind the next run filter to this repository identity, defaulting omitted paging to the first page. */
     setQuery: (next: ActionsRunsQuery) =>
       setQuery({ identity, query: { ...next, page: next.page ?? 1 } }),
     data: result.key === key ? result.data : null,
@@ -136,10 +137,12 @@ export function useActionsRuns(option: ActionsRepositoryOption | undefined) {
       workflows.identity === identity
         ? workflows
         : { items: [], more: false, limit: false, loading: false, error: null },
+    /** Retry or advance the workflow page without clearing loaded workflows or changing run paging. */
     moreWorkflows: () => {
       setWorkflowPage({ identity, page: workflows.page + 1 })
       setWorkflowRetry((value) => value + 1)
     },
+    /** Restart both lists at page one and invalidate cached reads only for an explicit full refresh. */
     refresh: () => {
       setQuery({ identity, query: { ...query, page: 1 } })
       setWorkflowPage({ identity, page: 1 })

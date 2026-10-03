@@ -149,6 +149,7 @@ export async function fetchActionsRuns(
   context: ActionsRequestContext,
   args: ActionsRunsQuery
 ): Promise<ActionsPage<ActionsRun>> {
+  /** Dispatch this read through the registered repository owner, including its pinned account and host. */
   const read = () =>
     requestActions(state, context, 'github.actionsRuns', args, () =>
       window.api.gh.actionsRuns({ ...context, ...args })
@@ -163,6 +164,7 @@ export async function fetchActionsWorkflows(
   context: ActionsRequestContext,
   args: ActionsWorkflowsQuery
 ): Promise<ActionsPage<ActionsWorkflow>> {
+  /** Dispatch this read through the registered repository owner, including its pinned account and host. */
   const read = () =>
     requestActions(state, context, 'github.actionsWorkflows', args, () =>
       window.api.gh.actionsWorkflows({ ...context, ...args })
@@ -177,6 +179,7 @@ export async function fetchActionsRunDetails(
   context: ActionsRequestContext,
   args: ActionsDetailsQuery
 ): Promise<ActionsRunDetails> {
+  /** Dispatch this read through the registered repository owner, including its pinned account and host. */
   const read = () =>
     requestActions(state, context, 'github.actionsRunDetails', args, () =>
       window.api.gh.actionsRunDetails({ ...context, ...args })

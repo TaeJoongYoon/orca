@@ -114,13 +114,16 @@ export function useActionsArtifacts(option: ActionsRepositoryOption, runId: numb
   return {
     ...state,
     download,
+    /** Replace the artifact list with a fresh first page while preserving download state. */
     refresh: () => {
       void read()
     },
+    /** Append the next artifact page through the same generation fence as initial reads. */
     more: () => {
       void read(true)
     },
     save,
+    /** Mark the current save for cancellation at its next transfer boundary without raising an error alert. */
     cancel: () => {
       canceled.current = true
     }

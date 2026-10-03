@@ -26,6 +26,7 @@ export async function withActionsRead<T>(
   }
 ): Promise<T> {
   const controller = new AbortController()
+  /** Forward caller cancellation to the queued or active GitHub read with its original reason. */
   const abort = (): void => controller.abort(signal?.reason)
   if (signal?.aborted) {
     abort()

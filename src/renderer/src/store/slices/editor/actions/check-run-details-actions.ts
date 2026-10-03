@@ -26,6 +26,7 @@ export function createCheckRunDetailsActions(
   'openCheckRunDetails' | 'patchOpenCheckRunDetails' | 'reloadOpenCheckRunDetailsTab'
 > {
   return {
+    /** Open or focus the stable detail tab while retaining its Actions owner context and current snapshot. */
     openCheckRunDetails: (worktreeId, contextKey, check, state) => {
       const id = buildCheckRunDetailsTabId(worktreeId, check)
       const label = getCheckRunDetailsTabLabel(check)
@@ -90,6 +91,7 @@ export function createCheckRunDetailsActions(
     },
 
     // Why: sidebar detail fetches can finish after the full-details tab is open; update the snapshot without stealing focus.
+    /** Update an existing matching tab without stealing focus or overwriting a newer request generation. */
     patchOpenCheckRunDetails: (worktreeId, contextKey, check, state) => {
       const id = buildCheckRunDetailsTabId(worktreeId, check)
       set((s) => {
@@ -144,6 +146,7 @@ export function createCheckRunDetailsActions(
       })
     },
 
+    /** Use the owner-bound Actions loader when present; otherwise retain the provider-specific check reload path. */
     reloadOpenCheckRunDetailsTab: async (fileId) => {
       const state = get()
       const file = state.openFiles.find((candidate) => candidate.id === fileId)

@@ -46,11 +46,13 @@ export function createArtifactSession(
   const transferId = randomUUID()
   const timer = setTimeout(() => releaseArtifactSession(transferId, owner), 5 * 60_000)
   timer.unref()
+  /** Release retained archive bytes immediately when the owning caller disconnects. */
   const abort = () => releaseArtifactSession(transferId, owner)
   sessions.set(transferId, {
     owner,
     archive,
     timer,
+    /** Detach the disconnect listener and release the retained caller lifetime when this session ends. */
     dispose: () => {
       signal?.removeEventListener('abort', abort)
       onRelease?.()

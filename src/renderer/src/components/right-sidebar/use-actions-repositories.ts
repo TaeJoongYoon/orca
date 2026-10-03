@@ -98,6 +98,7 @@ export function useActionsRepositories(
     options: result.key === key ? result.options : [],
     loading: result.key !== key || result.loading,
     error: result.key === key ? result.error : null,
+    /** Start a new repository probe generation so results from the previous attempt cannot replace it. */
     retry: () => setRetry((value) => value + 1)
   }
 }
