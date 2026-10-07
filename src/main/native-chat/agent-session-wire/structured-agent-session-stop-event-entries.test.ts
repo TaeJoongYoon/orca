@@ -14,6 +14,7 @@ import {
   eventually,
   type QueuedMessageTestRig
 } from './structured-agent-session-queued-message-rig.test-fixture'
+import { structuredQueuePauses } from './structured-agent-session-queued-pause'
 
 let rig: QueuedMessageTestRig
 
@@ -45,6 +46,9 @@ function stopEvents(): JournalStopEvent[] {
 function stopEventsAtClose(): { events: JournalStopEvent[] | null } {
   const seen: { events: JournalStopEvent[] | null } = { events: null }
   rig.closeSession.mockImplementationOnce(async () => {
+    // The event is issued before the kill, never awaited by it: the journal writes it ahead of
+    // anything the kill makes the child write.
+    await new Promise((resolve) => setImmediate(resolve))
     seen.events = stopEvents()
     return true
   })
@@ -286,9 +290,9 @@ describe('every Stop entry writes its event, with its reason, before it ends the
     expect(atClose.events?.map((event) => event.reason)).toEqual(['user-stop'])
   })
 
-  // The idle sweep finishes a stop whose exit was unproven: the same stop, so its event stands alone.
+  // A later stop joins a close whose exit was unproven: the same close, so its event stands alone.
   it.each([['user-close' as const], ['evict' as const]])(
-    'writes one event for a close (%s) whose exit was unproven, and none for its retry',
+    'writes one event for a close (%s) whose exit was unproven, and none for a stop that joins it',
     async (cause) => {
       rig = await createQueuedMessageTestRig({ idleSweep: MANUAL_IDLE_SWEEP })
       await runningTurn()
@@ -296,13 +300,14 @@ describe('every Stop entry writes its event, with its reason, before it ends the
       const session = () => rig.host.collaboratorsForTests().sessions.get(HOST_TEST_SESSION)!
 
       await rig.host.close(HOST_TEST_SESSION, cause).catch(() => undefined)
-      expect(session().child).not.toBeNull()
-      expect(session().owesProviderChildWindDown).toMatchObject({ cause })
+      expect(session().child?.close).toMatchObject({ cause })
       expect(stopEvents()).toEqual([{ reason: cause, turnId: 'turn-1', at: expect.any(Number) }])
 
-      await idleSweep().tick()
+      await rig.host['tasks'].serialize(HOST_TEST_SESSION, () =>
+        rig.host['lifetime'].stopAgent(HOST_TEST_SESSION, { cause: 'host-stop' })
+      )
 
-      expect(session().owesProviderChildWindDown).toBeUndefined()
+      expect(session().child).toBeNull()
       expect(stopEvents().map((event) => event.reason)).toEqual([cause])
       expect(session().lastEndedChild?.cause).toBe(cause)
     }
@@ -385,14 +390,14 @@ describe("a person's Stop pause and the Stop events after it", () => {
     expect(await rig.stop()).toMatchObject({ ok: true })
     await rig.settleAccepted(working, 'stopped')
     expect(await rig.queuePause()).toEqual({ reason: 'stopped' })
-    // Orchestration mail starts a turn the host sent, which lifts nothing.
-    await rig.send('mail for the lead', undefined, { internal: true }).result
+    // Orchestration mail's turn runs, but its send is not accepted yet, so it lifts nothing yet.
+    await rig.send('mail for the lead').result
     await journal().appendItem(
       { provider: 'codex', threadId: 'thread-1', turnId: 'turn-mail', ordinal: 999 },
       { kind: 'turn', turnId: 'turn-mail', state: 'running', startedAt: 1 },
       { fence: 1, turnScope: AGENT_JOURNAL_THREAD_SCOPE }
     )
-    expect(await rig.queuePause()).toEqual({ reason: 'stopped' })
+    expect(structuredQueuePauses(journal()).map((pause) => pause.reason)).toEqual(['stopped'])
     const atClose = stopEventsAtClose()
 
     await rig.host.close(HOST_TEST_SESSION, 'evict')
@@ -415,7 +420,7 @@ describe("a person's Stop pause and the Stop events after it", () => {
     await idleSweep().tick()
     expect(await rig.queuePause()).toEqual({ reason: 'stopped' })
     holdStart()
-    rig.send('mail for the lead', undefined, { internal: true })
+    rig.send('mail for the lead')
     await eventually(async () =>
       expect(rig.host.collaboratorsForTests().sessions.get(HOST_TEST_SESSION)?.child?.phase).toBe(
         'starting'

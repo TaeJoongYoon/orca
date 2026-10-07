@@ -39,6 +39,7 @@ import {
   HANDED_TO_TERMINAL,
   launchCommandPrompt,
   promptReceipt,
+  settledAtCreation,
   settleLaunchPromptDisposal
 } from './agent-launch-prompt-delivery'
 import type { TuiAgent } from '../../shared/tui-agent'
@@ -47,6 +48,7 @@ import {
   type WorkspaceLaunchKind
 } from '../../shared/workspace-launch-kind'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import { deriveAgentLaunchTerminalViewMode } from './agent-launch-view-mode'
 import { isDefinitiveAgentSessionCreateRefusal } from '../../shared/agent-session-definitive-refusal'
 import {
   decideAgentLaunchMode,
@@ -71,7 +73,17 @@ export type AgentLaunchExecution = {
   vocabulary?: AgentLaunchModeVocabulary
   /** Attributes a throw to the step that was running, the way a dispatch's own stages do. */
   onStage?: (stage: 'worktree_create' | 'mode_settle' | 'surface_create') => void
+  /** The surface exists and its tab is published; runs before any prompt delivery. Must not throw. */
+  onSurfacePublished?: (surface: AgentLaunchPublishedSurface) => void
 }
+
+/**
+ * The launch as it stands once its surface exists: a complete result whose prompt receipt says only
+ * what creation itself settled — carried on the launch command, a draft the host never delivers, or
+ * a submit still `unconfirmed`. Complete so a host that dies during the delivery still leaves a
+ * truthful answer behind.
+ */
+export type AgentLaunchPublishedSurface = AgentLaunchResult
 
 export async function executeAgentLaunch(
   execution: AgentLaunchExecution
@@ -99,13 +111,19 @@ export async function executeAgentLaunch(
   // A reused terminal already downgraded in the pre-flight; there is nothing to create. Its agent
   // was running before this launch existed, so argv is unreachable and the PTY is the only way in.
   if (intent.reuseTerminal) {
-    return {
+    const reused = published(execution, {
       outcome: { kind: 'terminal', handle: intent.reuseTerminal.handle },
       worktreeId: existingWorktreeId(intent.target),
       receipt: preflight,
+      ...promptReceipt(intent, settledAtCreation(intent, {}))
+    })
+    return {
+      ...reused,
       ...promptReceipt(
         intent,
-        await deliverTerminalLaunchPrompt(execution, intent.reuseTerminal.handle)
+        await deliverTerminalLaunchPrompt(execution, intent.reuseTerminal.handle, {
+          freshLaunch: false
+        })
       )
     }
   }
@@ -113,7 +131,7 @@ export async function executeAgentLaunch(
   const placed = await resolveWorkspace(execution, preflight)
   // Agent-first creation already produced the agent, so the pre-flight verdict is final.
   if (placed.startupTerminalHandle) {
-    return {
+    const startup = published(execution, {
       outcome: {
         kind: 'terminal',
         handle: placed.startupTerminalHandle,
@@ -122,11 +140,17 @@ export async function executeAgentLaunch(
       worktreeId: placed.worktreeId,
       receipt: preflight,
       ...(placed.warning ? { warning: placed.warning } : {}),
+      ...promptReceipt(intent, settledAtCreation(intent, placed))
+    })
+    return {
+      ...startup,
       ...promptReceipt(
         intent,
         placed.promptRodeLaunchCommand
           ? HANDED_TO_TERMINAL
-          : await deliverTerminalLaunchPrompt(execution, placed.startupTerminalHandle)
+          : await deliverTerminalLaunchPrompt(execution, placed.startupTerminalHandle, {
+              freshLaunch: true
+            })
       )
     }
   }
@@ -143,7 +167,7 @@ export async function executeAgentLaunch(
   execution.onStage?.('surface_create')
   let created: CreatedSurface
   try {
-    created = await createSurface(execution, placed.worktreeId, settled)
+    created = await createSurface(execution, placed, settled)
   } catch (error) {
     // The structured create path distinguishes a definitive pre-commit refusal from an unknown
     // outcome. Only the former is safe to replace with a terminal in the same workspace; retrying
@@ -156,7 +180,7 @@ export async function executeAgentLaunch(
       throw error
     }
     settled = downgradeAgentLaunchModeForStructuredRefusal(settled, vocabulary)
-    created = await createTerminalSurface(execution, placed.worktreeId)
+    created = await createTerminalSurface(execution, placed)
   }
   // Both CAN be set, so neither may be dropped. The create warns precisely when it produced no
   // startup terminal — `didSpawnStartup` stays false when that spawn throws — and that is the same
@@ -169,13 +193,25 @@ export async function executeAgentLaunch(
   // not start while looking at it. Telling those apart needs `createManagedWorktree` to stop
   // multiplexing "couldn't copy untracked files" and "startup terminal failed" into one string.
   const warning = combineLaunchWarnings(placed.warning, created.warning)
-  return {
+  const surface = published(execution, {
     outcome: created.outcome,
     worktreeId: placed.worktreeId,
     receipt: settled,
     ...(warning ? { warning } : {}),
+    ...promptReceipt(intent, settledAtCreation(intent, created))
+  })
+  return {
+    ...surface,
     ...promptReceipt(intent, await settleLaunchPromptDisposal(execution, created))
   }
+}
+
+function published(
+  execution: AgentLaunchExecution,
+  surface: AgentLaunchPublishedSurface
+): AgentLaunchPublishedSurface {
+  execution.onSurfacePublished?.(surface)
+  return surface
 }
 
 function downgradeAgentLaunchModeForStructuredRefusal(
@@ -195,6 +231,7 @@ async function resolveWorkspace(
   preflight: AgentLaunchModeReceipt
 ): Promise<{
   worktreeId: string
+  connectionId: string | null | undefined
   startupTerminalHandle: string | undefined
   startupTerminalPaneKey?: string
   warning?: string
@@ -204,7 +241,8 @@ async function resolveWorkspace(
   const { intent } = execution
   if (intent.target.kind === 'existing') {
     // Nothing was created, so there is no create warning to carry.
-    return { worktreeId: intent.target.worktree, startupTerminalHandle: undefined }
+    const { worktree: worktreeId, connectionId } = intent.target
+    return { worktreeId, connectionId, startupTerminalHandle: undefined }
   }
   const workspaces = execution.workspaces
   if (!workspaces) {
@@ -223,9 +261,10 @@ async function resolveWorkspace(
   })
   // Only when a startup terminal actually came back: a create that produced none ran no command,
   // so nothing carried the prompt and the launch still owes it to whatever surface it builds next.
-  return created.startupTerminalHandle && startupPrompt
-    ? { ...created, promptRodeLaunchCommand: true }
-    : created
+  const { promptRodeLaunchCommand, ...rest } = created
+  return rest.startupTerminalHandle && promptRodeLaunchCommand
+    ? { ...rest, promptRodeLaunchCommand: true }
+    : rest
 }
 
 /** `structured` is the same surface `outcome` names, kept typed so prompt delivery reads the create's
@@ -240,7 +279,7 @@ export type CreatedSurface = {
 
 async function createSurface(
   execution: AgentLaunchExecution,
-  worktreeId: string,
+  workspace: { worktreeId: string; connectionId: string | null | undefined },
   settled: AgentLaunchModeReceipt
 ): Promise<CreatedSurface> {
   const { intent, surfaces } = execution
@@ -248,7 +287,7 @@ async function createSurface(
     // One reservation serves either route: the tab half of the reserved pane is the chat's tab.
     const reservedTabId = intent.paneKey ? parsePaneKey(intent.paneKey)?.tabId : undefined
     const session = await surfaces.createStructuredSession({
-      worktreeId,
+      worktreeId: workspace.worktreeId,
       agent: intent.agent,
       ...(intent.sessionOptions ? { options: intent.sessionOptions } : {}),
       ...(intent.sessionId ? { sessionId: intent.sessionId } : {}),
@@ -265,20 +304,11 @@ async function createSurface(
       ...ignoredStructuredAgentArgsWarning(intent)
     }
   }
-  return createTerminalSurface(execution, worktreeId)
+  return createTerminalSurface(execution, workspace)
 }
 
 /**
- * A structured session cannot apply launch arguments, so a launch that carried some and got one
- * anyway has to say so.
- *
- * Reported rather than routed around: the arguments field is a TUI concern by an explicit decision
- * (`hasExplicitTuiLaunchCommand` reads the launch command and pointedly not the args, because the
- * Agent SDK and app-server version their option sets independently of the interactive CLI), so
- * downgrading here would override a stated user preference on the strength of a field that is not
- * evidence about the surface. `null` warns too: "no arguments" is also unapplied, and the structured
- * path still reads the bypass-permissions bit out of the user's *settings* default, so a caller that
- * asked for none can get a session running with more permission than it requested.
+ * Structured chat uses saved Arguments, so a per-call override still needs a truthful warning.
  */
 function ignoredStructuredAgentArgsWarning(
   intent: AgentLaunchIntent
@@ -287,7 +317,7 @@ function ignoredStructuredAgentArgsWarning(
     ? undefined
     : {
         warning:
-          'Started a structured chat session, which does not apply launch arguments; the requested arguments were ignored.'
+          'Started a structured chat session using saved agent Arguments; the per-launch argument override was ignored.'
       }
 }
 
@@ -310,15 +340,21 @@ function terminalLaunchInputs(intent: AgentLaunchIntent) {
  */
 async function createTerminalSurface(
   execution: AgentLaunchExecution,
-  worktreeId: string
+  workspace: { worktreeId: string; connectionId: string | null | undefined }
 ): Promise<CreatedSurface> {
   const { intent, surfaces } = execution
   const startupPrompt = argvLaunchPrompt(intent)
   const terminal = await surfaces.createTerminalAgent({
-    worktreeId,
+    worktreeId: workspace.worktreeId,
     agent: intent.agent,
     ...(startupPrompt ? { startupPrompt } : {}),
-    ...terminalLaunchInputs(intent)
+    ...terminalLaunchInputs(intent),
+    viewMode: deriveAgentLaunchTerminalViewMode({
+      settings: readAgentLaunchModeSettings(execution.runtime),
+      agent: intent.agent,
+      ...(intent.prompt ? { prompt: intent.prompt } : {}),
+      connectionId: workspace.connectionId
+    })
   })
   return {
     outcome: {
@@ -327,7 +363,7 @@ async function createTerminalSurface(
       ...(terminal.paneKey ? { paneKey: terminal.paneKey } : {})
     },
     ...(terminal.warning ? { warning: terminal.warning } : {}),
-    ...(startupPrompt ? { promptRodeLaunchCommand: true } : {})
+    ...(startupPrompt && terminal.promptRodeLaunchCommand ? { promptRodeLaunchCommand: true } : {})
   }
 }
 
