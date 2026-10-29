@@ -89,7 +89,6 @@ test('repository Actions filters, paging and all-job details stay hidden in ligh
       }
       ipcMain.handle('gh:repoSlug', async () => fixture.repository)
       ipcMain.handle('gh:actionsRuns', async (_event, args) => {
-        await new Promise((resolve) => setTimeout(resolve, 180))
         globalThis.__actionsTestQueries?.push(args)
         const page = args.page ?? 1
         return {
@@ -131,7 +130,6 @@ test('repository Actions filters, paging and all-job details stay hidden in ligh
         }
       })
       ipcMain.handle('gh:actionsRunDetails', async (_event, args) => {
-        await new Promise((resolve) => setTimeout(resolve, 180))
         return {
           name: fixture.run.displayTitle,
           status: 'completed',
@@ -163,7 +161,6 @@ test('repository Actions filters, paging and all-job details stay hidden in ligh
     },
     { repository, run, jobs }
   )
-  await page.waitForTimeout(8000)
   await page.evaluate(() => {
     const store = window.__store
     if (!store) {
@@ -198,10 +195,12 @@ test('repository Actions filters, paging and all-job details stay hidden in ligh
       )
     }))
   )
-  await page.waitForTimeout(400)
+  await expect(row).toBeVisible()
   expect(await electronApp.evaluate(() => globalThis.__actionsTestQueries?.length ?? 0)).toBe(calls)
   await page.getByRole('textbox', { name: 'Branch', exact: true }).fill('topic & release')
-  await page.waitForTimeout(250)
+  await expect(page.getByRole('textbox', { name: 'Branch', exact: true })).toHaveValue(
+    'topic & release'
+  )
   expect(await electronApp.evaluate(() => globalThis.__actionsTestQueries?.length ?? 0)).toBe(calls)
   await page.getByRole('textbox', { name: 'Branch', exact: true }).press('Enter')
   await expect
@@ -259,7 +258,9 @@ test('repository Actions filters, paging and all-job details stay hidden in ligh
       }
       await store.getState().updateSettingsOrThrow({ theme })
     }, theme)
-    await page.waitForTimeout(250)
+    await expect
+      .poll(() => page.locator('html').evaluate((element) => element.classList.contains('dark')))
+      .toBe(theme === 'dark')
     await expect(
       page.getByRole('status').filter({ hasText: 'Loading workflow details' })
     ).toHaveCount(0)

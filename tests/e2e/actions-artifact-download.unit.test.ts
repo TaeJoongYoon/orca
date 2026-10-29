@@ -83,9 +83,10 @@ beforeEach(async () => {
   })
   vi.mocked(requests.readActionsArtifactChunk).mockImplementation(
     async (_state, _context, args) => {
-      const nextOffset = Math.min(args.offset + 50, archive.length)
+      const offset = args.offset ?? 0
+      const nextOffset = Math.min(offset + 50, archive.length)
       return {
-        contentBase64: archive.subarray(args.offset, nextOffset).toString('base64'),
+        contentBase64: archive.subarray(offset, nextOffset).toString('base64'),
         nextOffset,
         done: nextOffset === archive.length
       }

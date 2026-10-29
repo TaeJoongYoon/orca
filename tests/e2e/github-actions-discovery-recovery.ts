@@ -13,7 +13,6 @@ test('Actions discovery failure remains reachable and recovers without changing 
       throw new Error('Synthetic SSH discovery unavailable')
     })
   })
-  await page.waitForTimeout(8000)
   await page.evaluate(() => {
     const store = window.__store!
     store.setState((state) => ({

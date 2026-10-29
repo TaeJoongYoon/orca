@@ -1,5 +1,4 @@
 {
-  "actions": { "next": "Next", "previous": "Previous" },
   "accounts": {
     "claude": {
       "switchSessions": {

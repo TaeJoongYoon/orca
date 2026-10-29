@@ -12,7 +12,7 @@ import type {
   ActionsArtifactDownloadQuery,
   ActionsArtifactTransferQuery
 } from '../../shared/github/actions-artifact-types'
-import { getRepoSshConnectionId } from '../../shared/execution-host'
+import { getRepoSshConnectionId, getRepoRoutingConnectionId } from '../../shared/execution-host'
 import { isFolderRepo } from '../../shared/repo-kind'
 import type {
   ActionsRunsQuery,
@@ -32,7 +32,6 @@ import {
   getWorkflowRunDetails
 } from '../github/client'
 import { getPRFileContents } from '../github/work-item-details'
-import { getRepoRoutingConnectionId } from '../../shared/execution-host'
 
 type LocalGitArgs = [] | [LocalProjectGhExecOptions]
 

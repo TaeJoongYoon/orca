@@ -1,5 +1,4 @@
 {
-  "actions.artifacts.invalidChunk": "Invalid artifact download chunk",
   "agentLaunch": {
     "opencode": {
       "updateRequired": "OpenCode cannot safely start with a chosen model on this version. Update OpenCode to a supported release, or omit the model choice.",
@@ -22265,8 +22264,6 @@
     "loading": "Loading runs…",
     "noMatches": "No workflow runs match these filters.",
     "noRuns": "This repository has no workflow runs.",
-    "previous": "Previous",
-    "next": "Next",
     "runsLimit": "Showing up to 1,000 runs. Open Actions on GitHub for older runs.",
     "statusQueued": "Queued",
     "statusRunning": "In progress",
@@ -22303,7 +22300,8 @@
       "limit": "Showing up to 1,000 artifacts. Open the run on GitHub for more.",
       "saving": "Downloading ZIP…",
       "cancel": "Cancel download",
-      "saved": "Saved ZIP to {{path}}"
+      "saved": "Saved ZIP to {{path}}",
+      "invalidChunk": "Invalid artifact download chunk"
     }
   },
   "checkRun": {

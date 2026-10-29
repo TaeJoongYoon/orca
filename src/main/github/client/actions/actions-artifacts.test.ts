@@ -47,15 +47,20 @@ describe('Actions artifacts', () => {
   it('allows queued acquisition and a slow archive beyond the metadata deadline', async () => {
     vi.useFakeTimers()
     vi.mocked(gh.acquire).mockImplementation(
-      () => new Promise((resolve) => setTimeout(resolve, 30_000))
+      () =>
+        new Promise((resolve) => {
+          // ast-grep-ignore: test-no-real-time-wait -- Fake timers simulate queue time beyond the metadata deadline.
+          setTimeout(resolve, 30_000)
+        })
     )
     call
       .mockResolvedValueOnce({ stdout: JSON.stringify(metadata), stderr: '' })
       .mockImplementationOnce(
         () =>
-          new Promise((resolve) =>
+          new Promise((resolve) => {
+            // ast-grep-ignore: test-no-real-time-wait -- Fake timers simulate archive transfer beyond the metadata deadline.
             setTimeout(() => resolve({ stdout: zip.toString('base64'), stderr: '' }), 40_000)
-          )
+          })
       )
     const pending = startActionsArtifactDownload('/repo', query)
     await vi.advanceTimersByTimeAsync(70_000)
