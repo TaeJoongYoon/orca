@@ -9,7 +9,6 @@ import { actionsCount, actionsRecord, mapActionsRun } from './workflow-run-field
 import { mapWorkflowJobs } from '../check/check-detail-field-mapping'
 import { attachFailedJobLogTails } from '../check/check-job-log-tails'
 import { rethrowCheckDetailsAbort } from '../check/check-details-abort'
-import { resolveCommand } from '../../../git/command-runner/wsl-command-resolution'
 
 /** Read the latest attempt’s jobs and bounded log excerpts; preserve run metadata when job reads fail. */
 export function getWorkflowRunDetails(
@@ -26,7 +25,7 @@ export function getWorkflowRunDetails(
     connectionId,
     localGitOptions,
     signal,
-    async (repository, options) => {
+    async (repository, options, context) => {
       const base = `repos/${repository.owner}/${repository.repo}/actions/runs/${args.runId}`
       const run = mapActionsRun(await actionsJson(base, options))
       if (run.id !== args.runId) {
@@ -50,18 +49,8 @@ export function getWorkflowRunDetails(
         }
         jobs = mapWorkflowJobs({ ...raw, jobs: raw.jobs.map(actionsRecord) })
         totalJobs = actionsCount(raw.total_count)
-        const wsl = resolveCommand('gh', [], options.cwd, options.wslDistro).wsl
-        await attachFailedJobLogTails(jobs, repository, options, {
-          executionOwner: JSON.stringify([
-            'actions',
-            connectionId ?? null,
-            wsl ? ['wsl', wsl.distro] : ['native'],
-            options.ghAccount?.host ?? null,
-            options.ghAccount?.user ?? null
-          ]),
-          retryUnavailable: Boolean(args.noCache),
-          warnings: logWarnings
-        })
+        await attachFailedJobLogTails(jobs, repository, options, context)
+        logWarnings.push(...jobs.filter((job) => job.logState === 'error').map((job) => job.name))
       } catch (error) {
         rethrowCheckDetailsAbort(options.signal, error)
         jobsError = error instanceof Error ? error.message : String(error)

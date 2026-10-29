@@ -1,17 +1,26 @@
 import { completedDurationSeconds } from '../../../../shared/github/actions-duration'
 import { formatNativeChatDuration } from '../../../../shared/native-chat-turn-status'
+import { actionsUrl } from '../../../../shared/github/actions-web-url'
+import { ActionsStatus } from '../right-sidebar/ActionsStatus'
 import React from 'react'
 import { CheckCircle2, ChevronDown, CircleDashed, MinusCircle, XCircle } from 'lucide-react'
 import { CheckJobLogTail } from '@/components/right-sidebar/check-job-log-tail'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { PRCheckJob, PRCheckStep } from '../../../../shared/github/check-types'
-import { resolveStepOutcome, summarizeJobSteps, type StepOutcome } from './check-job-step-status'
+import {
+  resolveStepOutcome,
+  summarizeJobSteps,
+  type StepOutcome
+} from '../../../../shared/pr-check-step-status'
 import { formatJobsForClipboard } from './check-run-clipboard-text'
-import { Button } from '@/components/ui/button'
-import { actionsUrl } from '../../../../shared/github/actions-web-url'
 import { CheckRunCopyButton } from './CheckRunCopyButton'
-import { ActionsStatus } from '../right-sidebar/ActionsStatus'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { scrollTopCache, setWithLRU } from '@/lib/scroll-cache'
+import { checkJobIdentities, checkReadingStepsKey } from './check-details-reading-cache'
+import type { CheckDetailsReadingOwner } from './check-details-reading-owner'
 
 function StepOutcomeIcon({ outcome }: { outcome: StepOutcome }): React.JSX.Element {
   switch (outcome) {
@@ -26,7 +35,6 @@ function StepOutcomeIcon({ outcome }: { outcome: StepOutcome }): React.JSX.Eleme
   }
 }
 
-/** Apply Actions status colors only when requested, leaving existing check-step presentation intact. */
 function StepRow({
   step,
   actionsStatusColors
@@ -63,54 +71,121 @@ function StepRow({
   )
 }
 
-/** Prioritize failed steps and retain expandable passing steps, with Actions styling enabled by the caller. */
+function OtherJobSteps({
+  steps,
+  summary,
+  failed,
+  identity,
+  owner,
+  actionsStatusColors
+}: {
+  steps: PRCheckStep[]
+  summary: string
+  failed: boolean
+  identity: string
+  owner?: CheckDetailsReadingOwner
+  actionsStatusColors: boolean
+}): React.JSX.Element {
+  const cacheKey = owner ? checkReadingStepsKey(owner.key, identity, failed) : undefined
+  const [open, setOpen] = React.useState(() => {
+    const saved = cacheKey ? scrollTopCache.get(cacheKey) : undefined
+    return saved === undefined ? !failed : saved === 1
+  })
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={(next) => {
+        if (owner && !owner.currentSteps(identity, failed)) {
+          return
+        }
+        owner?.cancel(identity)
+        if (owner?.current() && cacheKey) {
+          setWithLRU(scrollTopCache, cacheKey, next ? 1 : 0)
+        }
+        setOpen(next)
+      }}
+      className="mt-1"
+    >
+      <CollapsibleTrigger asChild>
+        <Button type="button" variant="ghost" size="xs" className="w-full justify-start">
+          <ChevronDown
+            className={cn(
+              'size-3.5 shrink-0 transition-transform motion-reduce:transition-none',
+              !open && '-rotate-90'
+            )}
+          />
+          <span>{summary}</span>
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent animation="height">
+        <div className="mt-0.5 grid gap-0.5 pl-5">
+          {steps.map((step) => (
+            <StepRow key={step.name} step={step} actionsStatusColors={actionsStatusColors} />
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
 function JobCard({
   job,
   jobLinkLabel,
+  identity,
+  owner,
   actionsStatusColors
 }: {
   job: PRCheckJob
   jobLinkLabel: string
+  identity: string
+  owner?: CheckDetailsReadingOwner
   actionsStatusColors: boolean
 }): React.JSX.Element {
   const duration = completedDurationSeconds(job.startedAt, job.completedAt)
   const breakdown = summarizeJobSteps(job)
   const jobFailed = resolveStepOutcome(job) === 'failure'
-  // Failures matter most, so surface them and collapse the passing/skipped noise
-  // behind a one-line summary. With no failures there is nothing to prioritize,
-  // so expand by default rather than hiding the job's only content.
   const collapsible = [...breakdown.succeeded, ...breakdown.skipped, ...breakdown.pending]
-  const failedStepKey = breakdown.failed
-    .map((step) => `${step.name}:${step.status ?? ''}:${step.conclusion ?? ''}`)
-    .join('\0')
-  const [showRest, setShowRest] = React.useState(breakdown.failed.length === 0)
-  React.useEffect(() => {
-    setShowRest(breakdown.failed.length === 0)
-  }, [breakdown.failed.length, failedStepKey])
-
   const summaryParts: string[] = []
   if (breakdown.succeeded.length > 0) {
+    const count = breakdown.succeeded.length
     summaryParts.push(
-      `${breakdown.succeeded.length} ${translate(
-        'auto.components.editor.CheckRunJobs.1c0a4d7e02',
-        'succeeded'
-      )}`
+      count === 1
+        ? translate(
+            'auto.components.editor.CheckRunJobs.stepsSucceeded_one',
+            '{{count}} succeeded',
+            {
+              count
+            }
+          )
+        : translate(
+            'auto.components.editor.CheckRunJobs.stepsSucceeded_other',
+            '{{count}} succeeded',
+            { count }
+          )
     )
   }
   if (breakdown.skipped.length > 0) {
+    const count = breakdown.skipped.length
     summaryParts.push(
-      `${breakdown.skipped.length} ${translate(
-        'auto.components.editor.CheckRunJobs.2d3b8f1a55',
-        'skipped'
-      )}`
+      count === 1
+        ? translate('auto.components.editor.CheckRunJobs.stepsSkipped_one', '{{count}} skipped', {
+            count
+          })
+        : translate('auto.components.editor.CheckRunJobs.stepsSkipped_other', '{{count}} skipped', {
+            count
+          })
     )
   }
   if (breakdown.pending.length > 0) {
+    const count = breakdown.pending.length
     summaryParts.push(
-      `${breakdown.pending.length} ${translate(
-        'auto.components.editor.CheckRunJobs.3e6c9a2b71',
-        'pending'
-      )}`
+      count === 1
+        ? translate('auto.components.editor.CheckRunJobs.stepsPending_one', '{{count}} pending', {
+            count
+          })
+        : translate('auto.components.editor.CheckRunJobs.stepsPending_other', '{{count}} pending', {
+            count
+          })
     )
   }
 
@@ -119,19 +194,28 @@ function JobCard({
       <div className="flex min-w-0 items-center gap-2">
         {actionsStatusColors ? (
           <ActionsStatus status={job.conclusion ?? job.status} iconOnly />
+        ) : jobFailed ? (
+          <XCircle className="size-4 shrink-0 text-destructive" />
         ) : (
-          <StepOutcomeIcon outcome={resolveStepOutcome(job)} />
+          <CheckCircle2 className="size-4 shrink-0 text-status-success" />
         )}
         <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
           {job.name}
         </span>
         {breakdown.failed.length > 0 && (
-          <span className="shrink-0 rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-destructive">
-            {breakdown.failed.length}
-            {' / '}
-            {breakdown.total}{' '}
-            {translate('auto.components.editor.CheckRunJobs.4f7d0c3e88', 'steps failed')}
-          </span>
+          <Badge variant="destructive">
+            {breakdown.total === 1
+              ? translate(
+                  'auto.components.editor.CheckRunJobs.stepsFailedOfTotal_one',
+                  '{{failed}} / {{count}} steps failed',
+                  { failed: breakdown.failed.length, count: breakdown.total }
+                )
+              : translate(
+                  'auto.components.editor.CheckRunJobs.stepsFailedOfTotal_other',
+                  '{{failed}} / {{count}} steps failed',
+                  { failed: breakdown.failed.length, count: breakdown.total }
+                )}
+          </Badge>
         )}
       </div>
 
@@ -140,36 +224,6 @@ function JobCard({
           {breakdown.failed.map((step) => (
             <StepRow key={step.name} step={step} actionsStatusColors={actionsStatusColors} />
           ))}
-        </div>
-      )}
-
-      {collapsible.length > 0 && (
-        <div className="mt-1">
-          <button
-            type="button"
-            onClick={() => setShowRest((value) => !value)}
-            className="flex w-full items-center gap-1.5 rounded py-1 text-xs text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-expanded={showRest}
-          >
-            <ChevronDown
-              className={cn(
-                'size-3.5 shrink-0 transition-transform',
-                showRest ? 'rotate-0' : '-rotate-90'
-              )}
-            />
-            <span>
-              {summaryParts.join(
-                translate('auto.components.editor.CheckRunJobs.5a8e1d4f23', ' · ')
-              )}
-            </span>
-          </button>
-          {showRest && (
-            <div className="mt-0.5 grid gap-0.5 pl-5">
-              {collapsible.map((step) => (
-                <StepRow key={step.name} step={step} actionsStatusColors={actionsStatusColors} />
-              ))}
-            </div>
-          )}
         </div>
       )}
 
@@ -187,30 +241,54 @@ function JobCard({
           </Button>
         )}
       </div>
-      {job.logTail && <CheckJobLogTail logTail={job.logTail} expanded={jobFailed} />}
+      <CheckJobLogTail
+        job={job}
+        surface="details"
+        jobIdentity={identity}
+        expanded={jobFailed}
+        positionOwner={owner}
+      />
+      {collapsible.length > 0 && (
+        <OtherJobSteps
+          key={JSON.stringify([identity, jobFailed])}
+          steps={collapsible}
+          failed={jobFailed}
+          identity={identity}
+          owner={owner}
+          actionsStatusColors={actionsStatusColors}
+          summary={summaryParts.join(
+            translate('auto.components.editor.CheckRunJobs.5a8e1d4f23', ' · ')
+          )}
+        />
+      )}
     </div>
   )
 }
 
-/** Reuse check-job rendering for Actions without changing the default presentation of other providers. */
 export function CheckRunJobs({
   jobs,
   hasFailedJobs,
+  positionOwner,
   jobLinkLabel = translate('checkRun.openJob', 'Open job'),
   actionsStatusColors = false
 }: {
   jobs: PRCheckJob[]
   hasFailedJobs: boolean
+  positionOwner?: CheckDetailsReadingOwner
   jobLinkLabel?: string
   actionsStatusColors?: boolean
 }): React.JSX.Element {
+  const entries = checkJobIdentities(jobs)
+  const visible = hasFailedJobs
+    ? entries.filter(({ job }) => resolveStepOutcome(job) === 'failure')
+    : entries
   const clipboardText = formatJobsForClipboard(
-    jobs,
+    visible.map(({ job }) => job),
     translate('auto.components.editor.CheckRunDetailsPanel.ee07b33924', 'unknown')
   )
 
   return (
-    <section className="rounded-md border border-border bg-background">
+    <section className="min-w-0 rounded-md border border-border bg-background">
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <div className="text-sm font-medium">
           {hasFailedJobs
@@ -223,10 +301,12 @@ export function CheckRunJobs({
         />
       </div>
       <div className="divide-y divide-border/50">
-        {jobs.map((job) => (
+        {visible.map(({ job, identity }) => (
           <JobCard
-            key={job.id ?? job.name}
+            key={identity}
             job={job}
+            identity={identity}
+            owner={positionOwner}
             jobLinkLabel={jobLinkLabel}
             actionsStatusColors={actionsStatusColors}
           />

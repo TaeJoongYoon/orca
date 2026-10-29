@@ -14,8 +14,8 @@ it.each(['destroyed', 'render-process-gone', 'did-navigate'])(
   (event) => {
     const renderer = new EventEmitter()
     const lifetime = abortWhenRendererGone({
-      once: (event, listener) => {
-        renderer.once(event, listener)
+      on: (event, listener) => {
+        renderer.on(event, listener)
         return Object.create(null)
       },
       removeListener: (event, listener) => {

@@ -12,7 +12,8 @@ import type {
   ActionsRunDetails
 } from '../../../../shared/github/actions-types'
 import type { GitHubRepositoryIdentity } from '../../../../shared/github/pull-request-types'
-import { callRuntimeRpc, RuntimeRpcCallError } from '../../runtime/runtime-rpc-client'
+import { callRuntimeRpc } from '../../runtime/runtime-rpc-client'
+import { RuntimeRpcCallError } from '../../runtime/runtime-rpc-result'
 import { getGitHubSourceTarget, getGitHubWorkItemRequestContext } from './work-item-routing'
 import { translate } from '@/i18n/i18n'
 

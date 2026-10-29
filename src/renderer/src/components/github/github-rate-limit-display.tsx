@@ -3,7 +3,7 @@ import { Gauge, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { installWindowVisibilityInterval } from '@/lib/window-visibility-interval'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import type {
   GetRateLimitResult,
   GitHubRateLimitSnapshot
@@ -157,14 +157,15 @@ function GitHubRateLimitRows({
                 tone === 'warn' && 'text-amber-700 dark:text-amber-300'
               )}
             >
-              {v.remaining}{' '}
-              {translate('auto.components.github.github.rate.limit.display.f42790d150', 'of')}{' '}
-              {v.limit}{' '}
               {translate(
-                'auto.components.github.github.rate.limit.display.6da1858354',
-                'left · resets in'
-              )}{' '}
-              {formatGitHubRateLimitReset(v.resetAt)}
+                'auto.components.github.github.rate.limit.display.remainingOfLimitResetsIn',
+                '{{remaining}} of {{limit}} left · resets in {{reset}}',
+                {
+                  remaining: v.remaining,
+                  limit: v.limit,
+                  reset: formatGitHubRateLimitReset(v.resetAt)
+                }
+              )}
             </span>
           </div>
         )

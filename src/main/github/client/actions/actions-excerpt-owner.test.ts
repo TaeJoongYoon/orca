@@ -18,7 +18,7 @@ it.each([
   { platform: 'darwin', unavailable: false },
   { platform: 'darwin', unavailable: true }
 ] as const)(
-  'scopes excerpts to execution on $platform (unavailable=$unavailable)',
+  'does not reuse excerpts across execution snapshots on $platform (unavailable=$unavailable)',
   async ({ platform, unavailable }) => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
     vi.spyOn(gh, 'acquire').mockResolvedValue(undefined)
@@ -36,7 +36,18 @@ it.each([
         return { stdout: `execution excerpt ${logCalls}`, stderr: '' }
       }
       const value = args[1]?.includes('/jobs?')
-        ? { jobs: [{ id: 99, name: 'Build', conclusion: 'failure' }], total_count: 1 }
+        ? {
+            jobs: [
+              {
+                id: 99,
+                name: 'Build',
+                status: 'completed',
+                completed_at: '2026-10-01T00:00:00Z',
+                conclusion: 'failure'
+              }
+            ],
+            total_count: 1
+          }
         : { id: 9, workflow_id: 5, run_number: 1, run_attempt: 1 }
       return { stdout: JSON.stringify(value), stderr: '' }
     })
@@ -52,13 +63,17 @@ it.each([
     const ubuntu = await read('//wsl.localhost/Ubuntu/home/user/repo')
     const debian = await read('\\\\wsl$\\Debian\\home\\user\\repo')
     expect(native).toBe(unavailable ? null : 'execution excerpt 1')
-    expect(ubuntu).toBe(unavailable ? null : `execution excerpt ${platform === 'win32' ? 2 : 1}`)
-    expect(debian).toBe(unavailable ? null : `execution excerpt ${platform === 'win32' ? 3 : 1}`)
-    expect(await read('//wsl.localhost/Ubuntu/home/user/repo', 'Debian')).toBe(ubuntu)
-    expect(await read('C:/repo', 'Ubuntu')).toBe(ubuntu)
-    expect(await read('/home/user/repo', 'Ubuntu')).toBe(ubuntu)
+    expect(ubuntu).toBe(unavailable ? null : 'execution excerpt 2')
+    expect(debian).toBe(unavailable ? null : 'execution excerpt 3')
+    expect(await read('//wsl.localhost/Ubuntu/home/user/repo', 'Debian')).toBe(
+      unavailable ? null : 'execution excerpt 4'
+    )
+    expect(await read('C:/repo', 'Ubuntu')).toBe(unavailable ? null : 'execution excerpt 5')
+    expect(await read('/home/user/repo', 'Ubuntu')).toBe(unavailable ? null : 'execution excerpt 6')
     expect(await read('C:/repo')).toBe(native)
-    expect(await read('\\\\wsl$\\Debian\\home\\user\\repo', 'Ubuntu')).toBe(debian)
-    expect(logCalls).toBe(platform === 'win32' ? 3 : 1)
+    expect(await read('\\\\wsl$\\Debian\\home\\user\\repo', 'Ubuntu')).toBe(
+      unavailable ? null : 'execution excerpt 7'
+    )
+    expect(logCalls).toBe(unavailable ? 8 : 7)
   }
 )

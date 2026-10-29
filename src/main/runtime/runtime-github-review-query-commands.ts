@@ -32,6 +32,7 @@ import {
   getWorkflowRunDetails
 } from '../github/client'
 import { getPRFileContents } from '../github/work-item-details'
+import { getRepoRoutingConnectionId } from '../../shared/execution-host'
 
 type LocalGitArgs = [] | [LocalProjectGhExecOptions]
 
@@ -159,7 +160,7 @@ export class RuntimeGitHubReviewQueryCommands {
     return getIssue(
       repo.path,
       number,
-      repo.connectionId ?? null,
+      getRepoRoutingConnectionId(repo),
       ...this.deps.getLocalGitArgs(repo)
     )
   }
@@ -178,7 +179,7 @@ export class RuntimeGitHubReviewQueryCommands {
       headSha,
       prRepo ?? null,
       options,
-      repo.connectionId ?? null,
+      getRepoRoutingConnectionId(repo),
       ...this.deps.getLocalGitArgs(repo)
     )
   }
@@ -199,7 +200,7 @@ export class RuntimeGitHubReviewQueryCommands {
     return getPRCheckDetails(
       repo.path,
       { ...args, prRepo: args.prRepo ?? null },
-      repo.connectionId ?? null,
+      getRepoRoutingConnectionId(repo),
       localGitOptions,
       signal
     )
@@ -216,7 +217,7 @@ export class RuntimeGitHubReviewQueryCommands {
       repo.path,
       prNumber,
       { ...options, prRepo: prRepo ?? null },
-      repo.connectionId ?? null,
+      getRepoRoutingConnectionId(repo),
       ...this.deps.getLocalGitArgs(repo)
     )
   }
@@ -236,7 +237,7 @@ export class RuntimeGitHubReviewQueryCommands {
     const repo = await this.deps.resolveRepo(repoSelector)
     return getPRFileContents({
       repoPath: repo.path,
-      connectionId: repo.connectionId ?? null,
+      connectionId: getRepoRoutingConnectionId(repo),
       localGitOptions: this.deps.getLocalGitArgs(repo)[0],
       ...args
     })

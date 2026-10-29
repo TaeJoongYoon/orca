@@ -10,7 +10,7 @@ import { PaginationBar } from '../../PaginationBar'
 import {
   GITHUB_TASK_HEADER_SURFACE_CLASS,
   formatRelativeTime
-} from '@/components/task-page-source-context'
+} from '@/components/task-page/task-page-source-context'
 
 const grid = 'grid-cols-[88px_minmax(260px,1fr)_140px_140px_100px]'
 /** Show bounded run paging with explicit loading, retry, empty and truncation states. */

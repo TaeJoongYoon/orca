@@ -3,7 +3,7 @@ import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import {
   normalizeGitHubReviewerLogins,
   parseGitHubReviewerInputLogins
-} from '@/components/github-pr-reviewer-display'
+} from '../../../../../shared/github/pr-reviewer-display'
 import { notifyWorkItemDetailsMutation } from '@/components/github/github-work-item-comment-mutations'
 import { buildRequestedReviewUsers } from '@/components/github/work-item-state-presentation'
 import { getGitHubRuntimeRepoId } from '@/lib/github-source-runtime-context'
@@ -14,7 +14,7 @@ import type {
 } from '../../../../../shared/github/pull-request-types'
 import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'
 import type { TaskSourceContext } from '../../../../../shared/task-source-context'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
 
 const MAX_REQUESTED_REVIEWERS = 15
 

@@ -1,3 +1,6 @@
+import { createCheckDetailsAdmissionLifetime } from '../check/check-details-admission-lifetime'
+import { snapshotCheckJobLogExecution } from '../check/check-job-log-execution'
+import type { CheckJobLogContext } from '../check/check-job-log-tails'
 import { acquire, release, ghExecFileAsync, type LocalGitExecOptions } from '../../gh-utils'
 import {
   getGitHubApiRepositoryForRemote,
@@ -19,7 +22,11 @@ export async function withActionsRead<T>(
   connectionId: string | null | undefined,
   localGitOptions: LocalGitExecOptions,
   signal: AbortSignal | undefined,
-  read: (repository: GitHubApiRepository, options: GhExecOptions) => Promise<T>,
+  read: (
+    repository: GitHubApiRepository,
+    options: GhExecOptions,
+    context: CheckJobLogContext
+  ) => Promise<T>,
   deadline = {
     timeoutMs: GITHUB_CHECK_DETAILS_HOST_TIMEOUT_MS,
     message: GITHUB_CHECK_DETAILS_TIMEOUT_MESSAGE
@@ -34,7 +41,8 @@ export async function withActionsRead<T>(
     signal?.addEventListener('abort', abort, { once: true })
   }
   const timer = setTimeout(() => controller.abort(new Error(deadline.message)), deadline.timeoutMs)
-  let acquired = false
+  const deadlineAt = Date.now() + deadline.timeoutMs
+  let admission: ReturnType<typeof createCheckDetailsAdmissionLifetime> | undefined
   try {
     const resolved = await waitForCheckDetailsResolution(
       resolveGitHubRepoExecution(
@@ -52,7 +60,8 @@ export async function withActionsRead<T>(
     if (!resolved.ownerRepo) {
       throw new Error('A verified GitHub repository is required for Actions')
     }
-    const options = { ...resolved.ghOptions, signal: controller.signal }
+    const snapshot = snapshotCheckJobLogExecution(resolved.ownerRepo, resolved.ghOptions)
+    const options = { ...snapshot.ghOptions, signal: controller.signal }
     const guard = repositoryRateLimitGuard(resolved.ownerRepo, 'core', options)
     if (guard.blocked) {
       throw new Error(
@@ -63,14 +72,22 @@ export async function withActionsRead<T>(
       controller.signal.throwIfAborted()
       throw error
     })
-    acquired = true
-    return await waitForCheckDetailsResolution(read(resolved.ownerRepo, options), controller.signal)
+    admission = createCheckDetailsAdmissionLifetime(release)
+    return await waitForCheckDetailsResolution(
+      read(resolved.ownerRepo, options, {
+        deadlineAt,
+        executionScope: snapshot.executionScope,
+        retainUntil: admission.retainUntil
+      }),
+      controller.signal
+    )
+  } catch (error) {
+    controller.signal.throwIfAborted()
+    throw error
   } finally {
     clearTimeout(timer)
     signal?.removeEventListener('abort', abort)
-    if (acquired) {
-      release()
-    }
+    admission?.finish()
   }
 }
 /** Parse a GitHub API response using the caller’s account, execution route and abort signal. */

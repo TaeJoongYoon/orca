@@ -1,6 +1,4 @@
-// Pure, clock-injected admission policy for PTY forks on an execution host.
-// The creation owner (the terminal daemon) calls it only on the branch that is
-// about to fork, so attach and adoption are never charged.
+// Clock-injected fork admission runs only at the terminal-daemon creation owner; attach/adoption are never charged.
 
 export type SpawnIntent = 'interactive' | 'user-resume' | 'automatic-restore' | 'automation'
 
@@ -16,6 +14,38 @@ export type AutomaticWorkMode =
       since: number
     }
 
+/** Refused legacy restore whose old client already cleared its resume handle; this record is the only remaining copy. */
+export type LegacyRestoreRecord = {
+  sessionId: string
+  reason: 'pressure' | 'host_cap'
+  refusedAt: number
+  agent: string | null
+  cwd: string | null
+  worktreeId: string | null
+  /** The resume command line the client sent; running it in `cwd` resumes the agent. */
+  command: string | null
+  identityDigest: string | null
+}
+
+/** What a daemon reports about automatic restores; `admission` says whether its gate enforces. */
+export type AutomaticWorkStatus = {
+  admission: 'observe' | 'enforce'
+  mode: AutomaticWorkMode
+  /** Absent from daemons that predate the record; clients treat absence as none. */
+  legacyRestores?: readonly LegacyRestoreRecord[]
+}
+
+/** `cleared` is the pause the resume lifted, or null when automatic restores were running. */
+export type AutomaticWorkResumeResult = AutomaticWorkStatus & { cleared: AutomaticWorkMode | null }
+
+/** A gate-bearing terminal host from before resume existed: its pause is real but unreachable. */
+export const AUTOMATIC_WORK_RESUME_UNSUPPORTED = 'terminal-host-predates-resume'
+
+export type AutomaticWorkResumeOutcome =
+  | AutomaticWorkResumeResult
+  | typeof AUTOMATIC_WORK_RESUME_UNSUPPORTED
+  | null
+
 export type SpawnRequestFacts = {
   clientId: string
   /** Null when the caller predates the field; presence opts the request into `defer`. */
@@ -26,11 +56,62 @@ export type SpawnRequestFacts = {
   deadlineAt: number
 }
 
+export const SPAWN_INTENTS = [
+  'interactive',
+  'user-resume',
+  'automatic-restore',
+  'automation'
+] as const satisfies readonly SpawnIntent[]
+
+export function isSpawnIntent(value: unknown): value is SpawnIntent {
+  return typeof value === 'string' && SPAWN_INTENTS.some((intent) => intent === value)
+}
+
+/** Never accept interactive from clients: it bypasses admission and older daemons surviving updates still trust it. */
+export const RESTORE_SPAWN_INTENTS = [
+  'user-resume',
+  'automatic-restore'
+] as const satisfies readonly SpawnIntent[]
+
+export type RestoreSpawnIntent = (typeof RESTORE_SPAWN_INTENTS)[number]
+
+export function isRestoreSpawnIntent(value: unknown): value is RestoreSpawnIntent {
+  return typeof value === 'string' && RESTORE_SPAWN_INTENTS.some((intent) => intent === value)
+}
+
+export type SpawnDeferralReason = 'paused' | 'live_cap' | 'pressure' | 'deadline'
+
+/** Sent only to requests that declared an intent; the fork never started. */
+export const TERMINAL_SPAWN_DEFERRED_CODE = 'terminal_spawn_deferred'
+export const TERMINAL_SPAWN_DEFERRED_PREFIX = `${TERMINAL_SPAWN_DEFERRED_CODE}:`
+/** Critical-pressure refusal for undeclared callers; avoid daemon-gone wording that would replace a healthy daemon. */
+export const TERMINAL_SPAWN_REFUSED_MESSAGE = 'terminal_spawn_refused: host under pressure'
+
+export function parseTerminalSpawnDeferral(message: string): SpawnDeferralReason | null {
+  if (!message.startsWith(TERMINAL_SPAWN_DEFERRED_PREFIX)) {
+    return null
+  }
+  const reason = message.slice(TERMINAL_SPAWN_DEFERRED_PREFIX.length)
+  return reason === 'paused' ||
+    reason === 'live_cap' ||
+    reason === 'pressure' ||
+    reason === 'deadline'
+    ? reason
+    : null
+}
+
+/** Finds a deferral in a spawn error, whether an RPC failure or the local IPC's wrapped message. */
+export function readTerminalSpawnDeferral(error: unknown): SpawnDeferralReason | null {
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
+  const index = message.indexOf(TERMINAL_SPAWN_DEFERRED_PREFIX)
+  return index === -1 ? null : parseTerminalSpawnDeferral(message.slice(index).split(/\s/)[0])
+}
+
 export type SpawnAdmissionDecision =
   | { kind: 'admit'; charge: SpawnCharge }
   /** `retryAt` null means "until a slot is released". */
   | { kind: 'wait'; charge: SpawnCharge; retryAt: number | null }
-  | { kind: 'defer'; reason: 'paused' | 'live_cap' | 'pressure' | 'deadline' }
+  | { kind: 'defer'; reason: SpawnDeferralReason }
   | { kind: 'refuse_retryable' }
 
 export type SpawnAdmissionLimits = {
@@ -101,9 +182,12 @@ export function resolveSpawnCharge(
   limits: SpawnAdmissionLimits,
   now: number
 ): SpawnCharge {
+  // Remote resumes have fresh terminal ids/no history seed, so infer from claims alone to pace reconnect storms.
+  // Legacy callers incur at most a short wait for user-started work.
+  const inferred = facts.hasAgentSessionClaim ? 'automatic-restore' : 'interactive'
+  // A claimed resume cannot use interactive to bypass admission.
   const intent =
-    facts.declaredIntent ??
-    (facts.hasAgentSessionClaim && facts.hasHistorySeed ? 'automatic-restore' : 'interactive')
+    facts.declaredIntent === 'interactive' ? inferred : (facts.declaredIntent ?? inferred)
   if (intent === 'interactive') {
     return 'interactive'
   }
@@ -143,14 +227,20 @@ export function decideSpawnAdmission(args: {
   }
   const negotiated = facts.declaredIntent !== null
   if (pressure === 'critical') {
-    // Why: an old caller clears its resume handle before spawning, so only critical
-    // pressure may refuse it, with the error it already treats as "reconnect".
-    return negotiated ? { kind: 'defer', reason: 'pressure' } : { kind: 'refuse_retryable' }
+    if (negotiated) {
+      return { kind: 'defer', reason: 'pressure' }
+    }
+    // Legacy clients clear resume handles before spawning; refuse only after the entire admission window.
+    return now >= facts.deadlineAt
+      ? { kind: 'refuse_retryable' }
+      : { kind: 'wait', charge, retryAt: null }
   }
-  if (negotiated && mode.kind === 'paused') {
+  // Why: a user's resume past its allowance is paced, never put back to sleep in front of them.
+  const mayDefer = negotiated && facts.declaredIntent !== 'user-resume'
+  if (mayDefer && mode.kind === 'paused') {
     return { kind: 'defer', reason: 'paused' }
   }
-  if (negotiated && state.liveAutomatic + state.inFlight.automatic >= limits.maxLiveAutomatic) {
+  if (mayDefer && state.liveAutomatic + state.inFlight.automatic >= limits.maxLiveAutomatic) {
     return { kind: 'defer', reason: 'live_cap' }
   }
   const bucket = refill(
@@ -168,13 +258,12 @@ export function decideSpawnAdmission(args: {
     : now + Math.ceil((1 - bucket.tokens) / automaticTokensPerMs(limits))
   if (retryAt !== null ? retryAt > facts.deadlineAt : now >= facts.deadlineAt) {
     // Why: an old caller is admitted at its deadline rather than refused (degraded pacing).
-    return negotiated ? { kind: 'defer', reason: 'deadline' } : { kind: 'admit', charge }
+    return mayDefer ? { kind: 'defer', reason: 'deadline' } : { kind: 'admit', charge }
   }
   return { kind: 'wait', charge, retryAt }
 }
 
-/** Applies an admit's accounting. Buckets may not go below zero, so an observe-only
- *  gate that admits everything still reports realistic would-wait counts. */
+/** Apply accounting without negative buckets so observe-only admission still reports realistic would-wait counts. */
 export function applySpawnAdmission(
   state: SpawnAdmissionState,
   facts: SpawnRequestFacts,

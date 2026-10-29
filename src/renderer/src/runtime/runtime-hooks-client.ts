@@ -2,11 +2,12 @@ import type { OrcaHooks } from '../../../shared/orca-yaml-hook-types'
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import type { SetupScriptImportCandidate } from '../../../shared/setup-script-imports'
 import { callRuntimeRpc } from './runtime-rpc-client'
-import { runtimeTargetForOwnerHostId, type RuntimeClientTarget } from './runtime-client-target'
+import { ipcOrRuntimeTargetForHostId } from './runtime-client-target'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 
 /** The repo's own host: a server's runtime, or this app (with `hostId`) for local and SSH repos. */
 function getHookInspectionTarget(hostId: ExecutionHostId): RuntimeClientTarget {
-  const target = runtimeTargetForOwnerHostId(hostId)
+  const target = ipcOrRuntimeTargetForHostId(hostId)
   if (!target) {
     throw new Error('The project host is unresolved.')
   }
@@ -18,6 +19,8 @@ export type HookCheckResult = {
   hasHooks: boolean
   hooks: OrcaHooks | null
   mayNeedUpdate: boolean
+  /** A background check refused because the repo's WSL distro is stopped or didn't answer. */
+  unavailable?: 'wsl-distro-stopped' | 'wsl-distro-unverifiable'
 }
 
 export type IssueCommandReadResult = {
@@ -29,13 +32,19 @@ export type IssueCommandReadResult = {
   source: 'local' | 'shared' | 'none'
 }
 
+/** `background`: a render-driven probe that must not boot a stopped WSL distro (E9); launches omit it. */
 export async function checkRuntimeHooks(
   hostId: ExecutionHostId,
-  repoId: string
+  repoId: string,
+  options: { background?: boolean } = {}
 ): Promise<HookCheckResult> {
   const target = getHookInspectionTarget(hostId)
   if (target.kind !== 'environment') {
-    return window.api.hooks.check({ repoId, hostId })
+    return window.api.hooks.check({
+      repoId,
+      hostId,
+      ...(options.background ? { background: true } : {})
+    })
   }
   return callRuntimeRpc<HookCheckResult>(
     target,

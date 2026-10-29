@@ -43,7 +43,7 @@ async function invoke(
 }
 
 describe.each(['unary', 'streaming'] as const)('Actions admission on %s transport', (transport) => {
-  it('declares workspace permission and refuses unbound SSH callers before retaining a lifetime', async () => {
+  it('declares workspace permission and refuses non-allowlisted mobile callers before retaining a lifetime', async () => {
     const runtime = new OrcaRuntimeService()
     const dispatcher = new RpcDispatcher({ runtime, methods: GITHUB_ACTIONS_METHODS })
     const retainConnectionLifetime = vi.fn()
@@ -54,7 +54,7 @@ describe.each(['unary', 'streaming'] as const)('Actions admission on %s transpor
         dispatcher,
         transport,
         {
-          callerScope: { kind: 'ssh-bridge', targetId: 'box', remoteCliControl: false },
+          callerScope: { kind: 'mobile' },
           retainConnectionLifetime
         },
         { ...request, method: method.name }

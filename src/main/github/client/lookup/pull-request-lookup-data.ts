@@ -61,6 +61,7 @@ export type RestPullRequest = {
   merged_at?: string | null
   mergeable?: boolean | null
   mergeable_state?: string | null
+  auto_merge?: unknown
   base?: { ref?: string; sha?: string }
   head?: {
     ref?: string
@@ -84,7 +85,7 @@ export const PR_BRANCH_LIST_JSON_FIELDS =
 
 export type GitHubPRBranchLookupOptions = HostedReviewExecutionOptions & {
   acceptMergedFallbackPR?: boolean
-  // Why: compare merged implicit PRs against the worktree HEAD, not main repo HEAD, without a worktree-scoped git call.
+  // Supply the actual worktree head without probing a different main-repo checkout.
   currentHeadOid?: string | null
 }
 
@@ -130,6 +131,10 @@ export function mapRestPullRequest(pr: RestPullRequest): PullRequestLookupData {
     updatedAt: pr.updated_at ?? '',
     isDraft: pr.draft,
     mergeable: mapRestPRMergeable(pr),
+    ...(pr.mergeable_state !== undefined
+      ? { mergeStateStatus: pr.mergeable_state?.toUpperCase() ?? null }
+      : {}),
+    ...('auto_merge' in pr ? { autoMergeRequest: pr.auto_merge } : {}),
     baseRefName: pr.base?.ref,
     headRefName: pr.head?.ref,
     baseRefOid: pr.base?.sha,
@@ -168,7 +173,7 @@ export function isMergedImplicitPR(
   data: PullRequestLookupData,
   linkedPRNumber?: number | null
 ): boolean {
-  // Why: a merged PR without an explicit link is just a historical branch match, not implicit review context.
+  // Historical merged branch matches alone do not establish current review context.
   return typeof linkedPRNumber !== 'number' && mapPRState(data.state, data.isDraft) === 'merged'
 }
 
@@ -180,7 +185,7 @@ export function shouldHideMergedImplicitPR(
   if (!data || !isMergedImplicitPR(data, linkedPRNumber)) {
     return false
   }
-  // Why: keep hiding historical merged branch matches, but preserve the merged PR for the exact commit currently checked out.
+  // Preserve historical merged reviews only when their head matches the current checkout.
   return !currentHeadOid || data.headRefOid !== currentHeadOid
 }
 
@@ -218,11 +223,7 @@ export async function getCurrentHeadOid(
   connectionId?: string | null,
   localGitOptions: { wslDistro?: string; admissionTier?: GitAdmissionTier } = {}
 ): Promise<string | null> {
-  const route = requireReachableGitRoute(getConnectionExecutionHostId(connectionId))
-  if (route.kind === 'ssh') {
-    const result = await route.provider.exec(['rev-parse', 'HEAD'], repoPath)
-    return result.stdout.trim() || null
-  }
+  requireReachableGitRoute(getConnectionExecutionHostId(connectionId))
   try {
     const result = await gitExecFileAsync(['rev-parse', 'HEAD'], {
       cwd: repoPath,

@@ -1,20 +1,17 @@
-/**
- * The real SSH host a conversion cell runs against: the Linux Docker fixture, or a Windows
- * OpenSSH host the ssh-windows-hosts lane provisioned and described in a descriptor file.
- */
+// Use the real Docker Linux host or the Windows OpenSSH descriptor provisioned by its CI lane.
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import type { TestInfo } from '@stablyai/playwright-test'
 import type { SshTargetCreateInput } from '../../../src/shared/ssh-types'
 import { parseWindowsHostCellDescriptor } from '../../../src/main/ssh/ssh-windows-host-cells'
 import {
-  blockDockerSshRelayTargetTcpForwarding,
-  cleanupDockerSshRelayTarget,
-  DOCKER_SSH_RELAY_REMOTE_REPO_PATH,
-  execDockerSshRelayTargetCommand,
-  execDockerSshRelayTargetControlCommand,
-  startDockerSshRelayTarget
-} from './docker-ssh-relay-target'
+  blockDockerSshHostTargetTcpForwarding,
+  cleanupDockerSshHostTarget,
+  DOCKER_SSH_HOST_REMOTE_REPO_PATH,
+  execDockerSshHostTargetCommand,
+  execDockerSshHostTargetControlCommand,
+  startDockerSshHostTarget
+} from './docker-ssh-host-target'
 
 export const ORCAD_CONVERT_HOST_ENV = 'ORCA_E2E_ORCAD_CONVERT_HOST'
 
@@ -29,6 +26,8 @@ export type OrcadConvertHost = {
   blockTcpForwarding?: () => void
   /** Docker only: runs a shell command on the host as the SSH user and returns its stdout. */
   exec?: (command: string) => string
+  /** Docker only: copies a host path (file or directory) to a local path. */
+  copyFromHost?: (remotePath: string, localPath: string) => void
   /** Docker only: kills every live SSH connection, leaving sshd listening; returns how many. */
   dropSshConnections?: () => number
   /** Docker only: freezes or thaws the whole host; TCP stays up but nothing answers. */
@@ -50,7 +49,7 @@ echo "$killed"
 export function startOrcadConvertHost(source: string, testInfo: TestInfo): OrcadConvertHost {
   const label = `orcad convert E2E ${Date.now()}`
   if (source === 'docker') {
-    const target = startDockerSshRelayTarget(testInfo)
+    const target = startDockerSshHostTarget(testInfo)
     return {
       input: {
         label,
@@ -61,14 +60,19 @@ export function startOrcadConvertHost(source: string, testInfo: TestInfo): Orcad
         identitiesOnly: true,
         relayGracePeriodSeconds: 1
       },
-      remoteRepoPath: DOCKER_SSH_RELAY_REMOTE_REPO_PATH,
+      remoteRepoPath: DOCKER_SSH_HOST_REMOTE_REPO_PATH,
       remoteFolderPath: '/tmp',
-      cleanup: () => cleanupDockerSshRelayTarget(target),
-      blockTcpForwarding: () => blockDockerSshRelayTargetTcpForwarding(target),
-      exec: (command) => execDockerSshRelayTargetCommand(target, command),
+      cleanup: () => cleanupDockerSshHostTarget(target),
+      blockTcpForwarding: () => blockDockerSshHostTargetTcpForwarding(target),
+      exec: (command) => execDockerSshHostTargetCommand(target, command),
+      copyFromHost: (remotePath, localPath) =>
+        execFileSync('docker', ['cp', `${target.containerName}:${remotePath}`, localPath], {
+          stdio: 'ignore',
+          timeout: 60_000
+        }),
       dropSshConnections: () =>
         Number(
-          execDockerSshRelayTargetControlCommand(target, DROP_SSH_CONNECTIONS).split('\n').at(-1)
+          execDockerSshHostTargetControlCommand(target, DROP_SSH_CONNECTIONS).split('\n').at(-1)
         ),
       setFrozen: (frozen) =>
         execFileSync('docker', [frozen ? 'pause' : 'unpause', target.containerName], {

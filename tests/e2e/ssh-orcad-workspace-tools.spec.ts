@@ -1,35 +1,32 @@
-/**
- * Workspace tools on an orcad-managed SSH host: Quick Open over a monorepo-sized tree, the host's
- * port scan and an SSH port forward, an image outside the workspace opened from a terminal link, and
- * agent status reported from a remote terminal.
- */
+// Exercise managed SSH Quick Open at monorepo scale, ports/forwards, outside-workspace image links and remote agent status.
 import { expect, test } from './helpers/orca-app'
 import { reconnect } from './helpers/orcad-convert-flow'
-import { shellQuote } from './helpers/docker-ssh-relay-target'
 import { callEnvironment, createPairedHostTerminal } from './helpers/paired-host-terminal'
 import { reserveLocalPort } from './helpers/reserve-local-port'
 import { openTerminalWorkspaceRootLink } from './helpers/terminal-workspace-root-link'
 import {
   echoMarker,
   expectTerminalAnswers,
+  activateManagedWorkspace,
   launchManagedWorkspace,
   openTerminalTab,
-  ORCAD_TEMPLATE,
+  relaunchManagedApp,
+  skipUnlessManagedDockerHost,
   typeInTerminal,
   withManagedHost
 } from './helpers/orcad-managed-workspace'
+import { quotePosixShell } from '../../src/shared/shell-argument-quoting'
+import { createServer } from 'node:net'
+import { waitForSessionReady } from './helpers/store'
 
-test.skip(
-  !ORCAD_TEMPLATE || process.env.ORCA_E2E_SSH_DOCKER !== '1',
-  'Needs Docker and server template'
-)
+skipUnlessManagedDockerHost()
 test.skip(process.platform === 'win32', 'The Docker SSH host uses POSIX tooling')
 
 test('Quick Open finds a file in a monorepo-sized managed workspace', async (// oxlint-disable-next-line no-empty-pattern -- Owns its app launch through a restart session.
 {}, testInfo) => {
   test.setTimeout(10 * 60_000)
   await withManagedHost(testInfo, async (fixture) => {
-    const repo = shellQuote(fixture.host.remoteRepoPath)
+    const repo = quotePosixShell(fixture.host.remoteRepoPath)
     // ~22.6k tracked paths: past the size whose single reply once overflowed the transport (#12547).
     fixture.host.exec!(
       [
@@ -58,19 +55,21 @@ test('Quick Open finds a file in a monorepo-sized managed workspace', async (// 
   })
 })
 
-for (const acrossReconnect of [false, true]) {
-  test(`a managed host reports its listener, and an SSH forward reaches it${acrossReconnect ? ' across a reconnect' : ''}`, async (// oxlint-disable-next-line no-empty-pattern -- Owns its app launch through a restart session.
+for (const across of ['', 'reconnect', 'restart without an SSH connect'] as const) {
+  test(`a managed host reports its listener, and an SSH forward reaches it${across ? ` across a ${across}` : ''}`, async (// oxlint-disable-next-line no-empty-pattern -- Owns its app launch through a restart session.
   {}, testInfo) => {
     test.setTimeout(10 * 60_000)
     const remotePort = 7860
     const marker = `ORCA_FORWARD_${Date.now()}`
     const reservation = await reserveLocalPort()
     await withManagedHost(testInfo, async (fixture) => {
-      const { page, seeded, environmentId } = await launchManagedWorkspace(fixture)
+      const launched = await launchManagedWorkspace(fixture)
+      const { seeded, environmentId } = launched
+      let page = launched.page
       const script = `require('node:http').createServer((_q, r) => r.end(${JSON.stringify(marker)})).listen(${remotePort}, '127.0.0.1')`
       // Started from the workspace so the scan attributes it to this workspace.
       fixture.host.exec!(
-        `cd ${shellQuote(fixture.host.remoteRepoPath)} && nohup node -e ${shellQuote(script)} >/tmp/orca-http.log 2>&1 < /dev/null &`
+        `cd ${quotePosixShell(fixture.host.remoteRepoPath)} && nohup node -e ${quotePosixShell(script)} >/tmp/orca-http.log 2>&1 < /dev/null &`
       )
       // The scan the Ports panel shows for a workspace on this host.
       await expect
@@ -96,8 +95,18 @@ for (const acrossReconnect of [false, true]) {
       }
       await expect.poll(fetchMarker, { timeout: 30_000 }).toBe(marker)
       let forwardId = forward.id
-      if (acrossReconnect) {
-        await reconnect(page, seeded.targetId)
+      if (across) {
+        if (across === 'reconnect') {
+          await reconnect(page, seeded.targetId)
+        } else {
+          // #32484: every SSH connect fails, so only the server's tunnel brings the host back.
+          page = await relaunchManagedApp(fixture, undefined, {
+            extraEnv: {
+              ORCA_E2E_FORBID_LOCAL_SSH_CONNECT_PROBE: testInfo.outputPath('ssh-connects.log')
+            }
+          })
+          await callEnvironment(page, environmentId, 'workspacePorts.scan', {})
+        }
         await expect.poll(fetchMarker, { timeout: 60_000 }).toBe(marker)
         // The restored forward is a new entry for the same saved port.
         const restored = await page.evaluate(
@@ -112,6 +121,68 @@ for (const acrossReconnect of [false, true]) {
   })
 }
 
+test('a saved forward whose local port is taken after a restart shows why, and can be removed', async (// oxlint-disable-next-line no-empty-pattern -- Owns its app launch through a restart session.
+{}, testInfo) => {
+  // Deploys a managed server, then quits and relaunches the app once.
+  test.setTimeout(10 * 60_000)
+  const reservation = await reserveLocalPort()
+  const localPort = reservation.port
+  await reservation.release()
+  await withManagedHost(testInfo, async (fixture) => {
+    const launched = await launchManagedWorkspace(fixture)
+    const { seeded, environmentId } = launched
+    await launched.page.evaluate(
+      (args) => window.api.ssh.addPortForward({ ...args, remoteHost: '127.0.0.1' }),
+      { targetId: seeded.targetId, localPort, remotePort: 7860, label: 'held' }
+    )
+    await fixture.session.close(launched.app)
+    fixture.app = null
+    // Another process takes the port while Orca is closed, so the restore can't bind it.
+    const holder = createServer()
+    await new Promise<void>((resolve) => holder.listen(localPort, '127.0.0.1', resolve))
+    try {
+      const { app, page } = await fixture.session.launch()
+      fixture.app = app
+      await waitForSessionReady(page)
+      await callEnvironment(page, environmentId, 'workspacePorts.scan', {})
+      await expect
+        .poll(
+          async () =>
+            JSON.stringify(
+              await page.evaluate(
+                (targetId) => window.api.ssh.listUnrestoredPortForwards({ targetId }),
+                seeded.targetId
+              )
+            ),
+          { timeout: 60_000, message: 'the held forward never reported why it did not start' }
+        )
+        .toContain('"error"')
+      await activateManagedWorkspace(page, seeded.worktreeId, environmentId)
+      await page.evaluate(() => {
+        const state = window.__store?.getState()
+        state?.setRightSidebarOpen(true)
+        state?.setRightSidebarTab('ports')
+      })
+      const row = page.locator('[data-ssh-unrestored-forward]')
+      await expect(row).toBeVisible({ timeout: 30_000 })
+      await expect(row).toContainText("Couldn't start")
+      await page.screenshot({ path: testInfo.outputPath('unrestored-forward-row.png') })
+      await row.getByRole('button').click()
+      await expect(row).toHaveCount(0)
+      await expect
+        .poll(() =>
+          page.evaluate(
+            (targetId) => window.api.ssh.listUnrestoredPortForwards({ targetId }),
+            seeded.targetId
+          )
+        )
+        .toEqual([])
+    } finally {
+      await new Promise<void>((resolve) => holder.close(() => resolve()))
+    }
+  })
+})
+
 test('a terminal link opens an image outside the managed workspace', async (// oxlint-disable-next-line no-empty-pattern -- Owns its app launch through a restart session.
 {}, testInfo) => {
   test.setTimeout(10 * 60_000)
@@ -120,7 +191,7 @@ test('a terminal link opens an image outside the managed workspace', async (// o
     'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR4AWN8z8DwnwEJMDGgAcICAO2mBAXmO4drAAAAAElFTkSuQmCC'
   await withManagedHost(testInfo, async (fixture) => {
     fixture.host.exec!(
-      `printf '%s' ${shellQuote(imageBase64)} | base64 -d > ${shellQuote(imagePath)}`
+      `printf '%s' ${quotePosixShell(imageBase64)} | base64 -d > ${quotePosixShell(imagePath)}`
     )
     // Why /root: the default folder workspace is /tmp, which would make the image a workspace file.
     const { page, seeded } = await launchManagedWorkspace(fixture, { folderPath: '/root' })
@@ -154,7 +225,7 @@ test('a managed terminal reports agent status from hooks and from Pi-style title
         '--data-urlencode "paneKey=${ORCA_PANE_KEY}" --data-urlencode "tabId=${ORCA_TAB_ID}"',
         '--data-urlencode "worktreeId=${ORCA_WORKTREE_ID}" --data-urlencode "env=${ORCA_AGENT_HOOK_ENV}"',
         '--data-urlencode "version=${ORCA_AGENT_HOOK_VERSION}"',
-        `--data-urlencode ${shellQuote(`payload=${payload}`)} >/tmp/orca-hook.log 2>&1 ) &`
+        `--data-urlencode ${quotePosixShell(`payload=${payload}`)} >/tmp/orca-hook.log 2>&1 ) &`
       ].join(' ')
     )
     await expect

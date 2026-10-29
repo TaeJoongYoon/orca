@@ -95,3 +95,26 @@ describe('Actions reads waiting for a GitHub operation slot', () => {
     expect(read).not.toHaveBeenCalled()
   })
 })
+
+it('retains the operation slot after cancellation until the log subprocess terminates', async () => {
+  gh.release()
+  let terminate = () => {}
+  const terminated = new Promise<void>((resolve) => {
+    terminate = resolve
+  })
+  const read = vi.fn<Parameters<typeof withActionsRead>[5]>(async (_repo, _options, context) => {
+    context.retainUntil(terminated)
+    return new Promise<never>(() => {})
+  })
+  const pending = withActionsRead('/repo', repository, null, {}, caller.signal, read)
+  const outcome = pending.catch((error: unknown) => error)
+  await vi.advanceTimersByTimeAsync(0)
+  expect(read).toHaveBeenCalledOnce()
+  const reason = new Error('Caller disconnected')
+  caller.abort(reason)
+  expect(await outcome).toBe(reason)
+  expect(gh.release).toHaveBeenCalledTimes(1)
+  terminate()
+  await vi.advanceTimersByTimeAsync(0)
+  expect(gh.release).toHaveBeenCalledTimes(2)
+})

@@ -9,7 +9,6 @@ const { clientMocks, moduleMocks } = await vi.hoisted(async () => {
 
 vi.mock('./gh-utils', () => moduleMocks.ghUtilsModuleMock(clientMocks))
 vi.mock('../git/runner', () => moduleMocks.gitRunnerModuleMock(clientMocks))
-vi.mock('../providers/ssh-git-dispatch', () => moduleMocks.sshGitDispatchModuleMock(clientMocks))
 vi.mock('./local-git-config-signature', () =>
   moduleMocks.localGitConfigSignatureModuleMock(clientMocks)
 )
@@ -445,9 +444,13 @@ describe('getPRForBranch', () => {
 
     const pr = await getPRForBranch('/repo-root', 'feature/test', 99)
 
-    expect(ghExecFileAsyncMock).toHaveBeenNthCalledWith(2, ['api', 'repos/acme/widgets/pulls/99'], {
-      cwd: '/repo-root'
-    })
+    expect(ghExecFileAsyncMock).toHaveBeenNthCalledWith(
+      2,
+      ['api', 'repos/acme/widgets/pulls/99', '--include'],
+      {
+        cwd: '/repo-root'
+      }
+    )
     expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(2)
     expect(pr).toBeNull()
   })
@@ -478,9 +481,13 @@ describe('getPRForBranch', () => {
 
     const pr = await getPRForBranch('/repo-root', 'feature/test', 99)
 
-    expect(ghExecFileAsyncMock).toHaveBeenNthCalledWith(2, ['api', 'repos/acme/widgets/pulls/99'], {
-      cwd: '/repo-root'
-    })
+    expect(ghExecFileAsyncMock).toHaveBeenNthCalledWith(
+      2,
+      ['api', 'repos/acme/widgets/pulls/99', '--include'],
+      {
+        cwd: '/repo-root'
+      }
+    )
     expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(2)
     expect(pr).toBeNull()
   })
@@ -506,9 +513,13 @@ describe('getPRForBranch', () => {
       ],
       { cwd: '/repo-root' }
     )
-    expect(ghExecFileAsyncMock).toHaveBeenNthCalledWith(2, ['api', 'repos/acme/widgets/pulls/99'], {
-      cwd: '/repo-root'
-    })
+    expect(ghExecFileAsyncMock).toHaveBeenNthCalledWith(
+      2,
+      ['api', 'repos/acme/widgets/pulls/99', '--include'],
+      {
+        cwd: '/repo-root'
+      }
+    )
     expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(2)
     expect(pr).toBeNull()
   })
@@ -593,6 +604,7 @@ describe('getPRForBranch', () => {
 
   it('falls back to gh pr view when the remote cannot be resolved to GitHub', async () => {
     getOwnerRepoMock.mockResolvedValueOnce(null)
+    gitExecFileAsyncMock.mockResolvedValue({ stdout: '', stderr: '' })
     ghExecFileAsyncMock.mockResolvedValueOnce({
       stdout: JSON.stringify({
         number: 7,
@@ -662,9 +674,13 @@ describe('getPRForBranch', () => {
       ],
       { cwd: '/repo-root' }
     )
-    expect(ghExecFileAsyncMock).toHaveBeenNthCalledWith(2, ['api', 'repos/acme/widgets/pulls/99'], {
-      cwd: '/repo-root'
-    })
+    expect(ghExecFileAsyncMock).toHaveBeenNthCalledWith(
+      2,
+      ['api', 'repos/acme/widgets/pulls/99', '--include'],
+      {
+        cwd: '/repo-root'
+      }
+    )
     expect(ghExecFileAsyncMock).toHaveBeenCalledTimes(2)
     expect(pr).toMatchObject({
       number: 99,

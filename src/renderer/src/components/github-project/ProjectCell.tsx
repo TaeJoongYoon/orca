@@ -1,4 +1,4 @@
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import React from 'react'
 import { TYPE_FIELD_DATA_TYPE } from './columns'
 import type {
@@ -90,6 +90,34 @@ export default function ProjectCell({
     return (
       <span className="truncate text-xs text-muted-foreground">
         {row.content.parentIssue ? `#${row.content.parentIssue.number}` : ''}
+      </span>
+    )
+  }
+  if (field.dataType === 'LINKED_PULL_REQUESTS') {
+    const linked = row.content.linkedPullRequests
+    if (!linked) {
+      return <span className="text-xs text-muted-foreground" />
+    }
+    const labels = linked.pullRequests.map((pr) => `#${pr.number}`)
+    const overflow =
+      linked.totalCount > linked.pullRequests.length
+        ? ` +${linked.totalCount - linked.pullRequests.length}`
+        : ''
+    return (
+      <span className="truncate text-xs text-muted-foreground">
+        {labels.join(', ')}
+        {overflow}
+      </span>
+    )
+  }
+  if (field.dataType === 'SUB_ISSUES_PROGRESS') {
+    const progress = row.content.subIssuesProgress
+    if (!progress || progress.total === 0) {
+      return <span className="text-xs text-muted-foreground" />
+    }
+    return (
+      <span className="truncate text-xs text-muted-foreground">
+        {progress.completed}/{progress.total} ({progress.percentCompleted}%)
       </span>
     )
   }

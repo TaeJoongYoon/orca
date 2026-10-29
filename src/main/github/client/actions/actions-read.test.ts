@@ -40,7 +40,15 @@ function json(value: unknown) {
 describe('bounded repository Actions reads', () => {
   it('isolates successful and unavailable excerpts by account and native/WSL owner', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
-    const jobs = [{ id: 1, name: 'Build', conclusion: 'failure' }]
+    const jobs = [
+      {
+        id: 1,
+        name: 'Build',
+        status: 'completed',
+        completed_at: '2026-10-01T00:00:00Z',
+        conclusion: 'failure'
+      }
+    ]
     let logCalls = 0
     vi.spyOn(gh, 'ghExecFileAsync').mockImplementation(async (args) => {
       if (args[1]?.endsWith('/logs')) {
@@ -56,7 +64,7 @@ describe('bounded repository Actions reads', () => {
     const read = async (user: string, wslDistro?: string) => {
       resolve.mockResolvedValue({
         ownerRepo: repository,
-        ghOptions: { ghAccount: { host: repository.host, user }, wslDistro }
+        ghOptions: { cwd: '/repo', ghAccount: { host: repository.host, user }, wslDistro }
       })
       return getWorkflowRunDetails('/repo', { repository, runId: 9 })
     }
@@ -65,8 +73,8 @@ describe('bounded repository Actions reads', () => {
     expect((await read('b', 'Ubuntu')).jobs[0].logTail).toContain('owner excerpt 3')
     expect((await read('b', 'Debian')).jobs[0].logTail).toContain('owner excerpt 4')
     expect((await read('b')).jobs[0].logTail).toContain('owner excerpt 2')
-    expect((await read('a')).jobs[0].logTail).toBeNull()
-    expect(logCalls).toBe(4)
+    expect((await read('a')).jobs[0].logTail).toContain('owner excerpt 5')
+    expect(logCalls).toBe(5)
   })
   it('queries the whole repository without a PR and preserves Enterprise execution options', async () => {
     const command = vi

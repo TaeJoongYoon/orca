@@ -54,10 +54,14 @@ import type { PreflightApi } from './api/preflight-api'
 import type { PtyApi } from './api/pty-api'
 import type { ProjectGroupsApi, ProjectsApi, RepositoryApi } from './api/repository-api'
 import type { RuntimeApi } from './api/runtime-api'
+import type { WslMoveApi } from './api/wsl-move-bridge'
+import type { WslDriveProjectApi } from './api/wsl-drive-project-bridge'
 import type { KeybindingsApi, SettingsApi } from './api/settings-api'
 import type { ShellApi } from './api/shell-api'
 import type { SpeechApi } from './api/speech-api'
 import type { SshApi } from './api/ssh-api'
+import type { PlainSshTerminalApi } from './api/plain-ssh-terminal-bridge'
+import type { LegacyRelayBridgeApi } from './api/legacy-relay-bridge-api'
 import type { DiagnosticsApi, MemoryApi, StatsApi, TelemetryApi } from './api/telemetry-api'
 import type { UiCommandEventApi } from './api/ui-command-event-api'
 import type { UiWindowApi } from './api/ui-window-api'
@@ -152,8 +156,14 @@ export type PreloadApi = {
   grokAccounts: GrokAccountsApi
   cursorAccounts: CursorAccountsApi
   ssh: SshApi
+  /** Desktop only: an unmanaged ssh login to a host whose move is blocked. */
+  plainSsh?: PlainSshTerminalApi
+  /** COMPAT(legacy-relay-bridge): desktop-only, revisit 2027-01-15. */
+  legacyRelayBridge?: LegacyRelayBridgeApi
   automations: AutomationsApi
   wsl: RuntimeApi['wsl']
+  wslMove: WslMoveApi
+  wslDriveProject: WslDriveProjectApi
   pwsh: RuntimeApi['pwsh']
   gitBash: RuntimeApi['gitBash']
   plugins: PluginsApi
@@ -183,6 +193,9 @@ export type {
   NativeChatSubscriptionFrame
 } from './api/native-chat-api'
 export type {
+  PluginAutoUpdateEvent,
+  PluginHostCustomEditor,
+  PluginHostNewFile,
   PluginHostInstallResult,
   PluginHostInstallSource,
   PluginHostListEntry,
@@ -204,7 +217,9 @@ export type {
   PtyManagementDaemonCwdClass,
   PtyManagementFolderAccessMismatch,
   PtyManagementMacTccAttributionHealth,
-  PtyManagementSession
+  PtyManagementSession,
+  PtyManagementSeveredDaemon,
+  PtyManagementSeveredDaemonRestartResult
 } from './api/pty-management-api'
 export type {
   ShellOpenExternalEditorRequest,
