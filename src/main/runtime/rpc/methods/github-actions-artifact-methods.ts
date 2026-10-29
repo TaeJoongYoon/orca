@@ -49,7 +49,9 @@ export const GITHUB_ACTIONS_ARTIFACT_METHODS = [
     permission: 'workspace',
     params: ActionsArtifactTransfer,
     /** Release the owner-matching archive and its retained disconnect lifetime. */
-    handler: (params, { runtime }) =>
-      runtime.releaseRepoActionsArtifactDownload(params.repo, params)
+    handler: async (params, { runtime }) => {
+      await runtime.releaseRepoActionsArtifactDownload(params.repo, params)
+      return null
+    }
   })
 ]

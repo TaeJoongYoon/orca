@@ -1,3 +1,4 @@
+import { githubRepoIdentityKey } from '../../../../shared/github/repository-identity-key'
 import { createCheckDetailsAdmissionLifetime } from '../check/check-details-admission-lifetime'
 import { snapshotCheckJobLogExecution } from '../check/check-job-log-execution'
 import type { CheckJobLogContext } from '../check/check-job-log-tails'
@@ -47,11 +48,24 @@ export async function withActionsRead<T>(
     const resolved = await waitForCheckDetailsResolution(
       resolveGitHubRepoExecution(
         repoPath,
-        repository ??
-          (() =>
-            getGitHubApiRepositoryForRemote(repoPath, 'origin', connectionId, localGitOptions, {
-              requireVerifiedSshProbe: true
-            })),
+        async () => {
+          const origin = await getGitHubApiRepositoryForRemote(
+            repoPath,
+            'origin',
+            connectionId,
+            localGitOptions,
+            { requireVerifiedSshProbe: true }
+          )
+          if (
+            origin &&
+            repository &&
+            githubRepoIdentityKey({ ...repository, host: repository.host ?? origin.host }) !==
+              githubRepoIdentityKey(origin)
+          ) {
+            throw new Error('Actions repository does not match the registered origin')
+          }
+          return origin
+        },
         connectionId,
         localGitOptions
       ),
