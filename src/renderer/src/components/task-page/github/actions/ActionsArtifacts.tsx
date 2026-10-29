@@ -1,7 +1,7 @@
 import { Download, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { translate } from '@/i18n/i18n'
+import { getIntlLocale, translate } from '@/i18n/i18n'
 import { formatBytes } from '@/components/status-bar/workspace-space-format'
 import type { ActionsRepositoryOption } from '@/components/right-sidebar/use-actions-repositories'
 import { ACTIONS_ARTIFACT_MAX_BYTES } from '../../../../../../shared/github/actions-artifact-types'
@@ -74,7 +74,7 @@ export function ActionsArtifacts({
                 <p className="mt-1 text-xs text-muted-foreground">
                   {formatBytes(artifact.sizeBytes)}
                   {artifact.expiresAt
-                    ? ` · ${translate('actions.artifacts.expires', 'Expires')} ${new Date(artifact.expiresAt).toLocaleString()}`
+                    ? ` · ${translate('actions.artifacts.expires', 'Expires')} ${new Date(artifact.expiresAt).toLocaleString(getIntlLocale())}`
                     : ''}
                 </p>
                 {tooLarge && (

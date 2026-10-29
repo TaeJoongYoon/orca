@@ -5,7 +5,7 @@ import { ActionsStatus } from '../right-sidebar/ActionsStatus'
 import React from 'react'
 import { CheckCircle2, ChevronDown, CircleDashed, MinusCircle, XCircle } from 'lucide-react'
 import { CheckJobLogTail } from '@/components/right-sidebar/check-job-log-tail'
-import { translate } from '@/i18n/i18n'
+import { getIntlLocale, translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import type { PRCheckJob, PRCheckStep } from '../../../../shared/github/check-types'
 import {
@@ -216,7 +216,7 @@ function JobCard({
         ) : (
           <span>{job.conclusion ?? job.status}</span>
         )}
-        {job.startedAt && <span>{new Date(job.startedAt).toLocaleString()}</span>}
+        {job.startedAt && <span>{new Date(job.startedAt).toLocaleString(getIntlLocale())}</span>}
         {duration !== null && <span>{formatNativeChatDuration(duration)}</span>}
         {actionsUrl(job.url) && (
           <Button variant="link" size="xs" onClick={() => window.api.shell.openUrl(job.url!)}>

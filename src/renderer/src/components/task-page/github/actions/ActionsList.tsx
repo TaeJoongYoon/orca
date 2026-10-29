@@ -1,7 +1,7 @@
 import { Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { translate } from '@/i18n/i18n'
+import { getIntlLocale, translate } from '@/i18n/i18n'
 import { useDelayedStatus } from '@/hooks/use-delayed-status'
 import { ActionsStatus } from '@/components/right-sidebar/ActionsStatus'
 import type { useActionsRuns } from '@/components/right-sidebar/use-actions-runs'
@@ -97,7 +97,11 @@ export function ActionsList({
               </span>
               <span
                 className="text-xs text-muted-foreground"
-                title={run.updatedAt ? new Date(run.updatedAt).toLocaleString() : undefined}
+                title={
+                  run.updatedAt
+                    ? new Date(run.updatedAt).toLocaleString(getIntlLocale())
+                    : undefined
+                }
               >
                 {run.updatedAt ? formatRelativeTime(run.updatedAt) : '—'}
               </span>

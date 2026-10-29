@@ -9,7 +9,7 @@ import { CheckRunJobs } from './CheckRunJobs'
 import type { OpenFile } from '@/store/slices/editor/types/open-file'
 import { loadActionsDetailTab } from '@/store/github/actions-detail-tabs'
 import { ArrowLeft } from 'lucide-react'
-import { translate } from '@/i18n/i18n'
+import { getIntlLocale, translate } from '@/i18n/i18n'
 import { actionsRepositoryUrl, actionsUrl } from '../../../../shared/github/actions-web-url'
 
 /** Reload editor-tab details through the request-generation fence used by other check-detail tabs. */
@@ -81,11 +81,11 @@ export function ActionsRunDetailsContent({
             </span>
             <span>
               {translate('actions.created', 'Created')}{' '}
-              {run.createdAt ? new Date(run.createdAt).toLocaleString() : '—'}
+              {run.createdAt ? new Date(run.createdAt).toLocaleString(getIntlLocale()) : '—'}
             </span>
             <span>
               {translate('actions.started', 'Started')}{' '}
-              {run.runStartedAt ? new Date(run.runStartedAt).toLocaleString() : '—'}
+              {run.runStartedAt ? new Date(run.runStartedAt).toLocaleString(getIntlLocale()) : '—'}
             </span>
             {duration !== null && (
               <span>
@@ -94,7 +94,7 @@ export function ActionsRunDetailsContent({
             )}
             <span>
               {translate('actions.updated', 'Updated')}{' '}
-              {run.updatedAt ? new Date(run.updatedAt).toLocaleString() : '—'}
+              {run.updatedAt ? new Date(run.updatedAt).toLocaleString(getIntlLocale()) : '—'}
             </span>
           </div>
         )}
