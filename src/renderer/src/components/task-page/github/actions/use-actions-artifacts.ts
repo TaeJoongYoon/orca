@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { isWebClientLocation } from '@/lib/web-client-location'
 import { useAppStore } from '@/store'
 import { fetchActionsArtifacts } from '@/store/github/actions-artifact-requests'
 import { actionsRepoProbeKey } from '@/components/right-sidebar/actions-repositories'
@@ -8,6 +9,9 @@ import type { ActionsArtifact } from '../../../../../../shared/github/actions-ar
 import { downloadActionsArtifact } from './download-actions-artifact'
 /** Fence paginated artifact reads and coordinate one cancelable save without treating intentional cancel as an error. */
 export function useActionsArtifacts(option: ActionsRepositoryOption, runId: number) {
+  const { id: repoId, path: repoPath } = option.repo
+  const ownerKey = actionsRepoProbeKey(option.repo)
+  const { owner, repo: repoName, host } = option.repository
   const [state, setState] = useState<{
     data: ActionsPage<ActionsArtifact> | null
     loading: boolean
@@ -16,14 +20,15 @@ export function useActionsArtifacts(option: ActionsRepositoryOption, runId: numb
   const [download, setDownload] = useState<{
     id: number | null
     percent: number
+    saving: boolean
     error: string | null
     saved: string | null
-  }>({ id: null, percent: 0, error: null, saved: null })
+  }>({ id: null, percent: 0, saving: false, error: null, saved: null })
   const current = useRef(state)
   current.current = state
   const generation = useRef(0)
   const alive = useRef(true)
-  const canceled = useRef(false)
+  const activeDownload = useRef<{ canceled: boolean; saving: boolean } | null>(null)
   const read = useCallback(
     async (append = false) => {
       const prior = current.current.data
@@ -36,11 +41,15 @@ export function useActionsArtifacts(option: ActionsRepositoryOption, runId: numb
         const data = await fetchActionsArtifacts(
           useAppStore.getState(),
           {
-            repoId: option.repo.id,
-            repoPath: option.repo.path,
-            ownerKey: actionsRepoProbeKey(option.repo)
+            repoId,
+            repoPath,
+            ownerKey
           },
-          { repository: option.repository, runId, page: append && prior ? prior.page + 1 : 1 }
+          {
+            repository: { owner, repo: repoName, host },
+            runId,
+            page: append && prior ? prior.page + 1 : 1
+          }
         )
         if (generation.current !== request) {
           return
@@ -60,60 +69,73 @@ export function useActionsArtifacts(option: ActionsRepositoryOption, runId: numb
         }
       }
     },
-    [option, runId]
+    [repoId, repoPath, ownerKey, owner, repoName, host, runId]
   )
   useEffect(() => {
     alive.current = true
+    setState({ data: null, loading: true, error: null })
+    setDownload({ id: null, percent: 0, saving: false, error: null, saved: null })
     void read()
     return () => {
       alive.current = false
+      activeDownload.current = null
       generation.current += 1
     }
   }, [read])
-  /** Serialize saves for this view and suppress completion updates after unmount or intentional cancellation. */
+  /** Keep each save owned by its view, including cleanup after cancellation or navigation. */
   const save = async (artifact: ActionsArtifact) => {
-    if (download.id !== null) {
+    if (activeDownload.current || isWebClientLocation()) {
       return
     }
-    canceled.current = false
-    setDownload({ id: artifact.id, percent: 0, error: null, saved: null })
+    const operation = { canceled: false, saving: false }
+    activeDownload.current = operation
+    const currentDownload = () => alive.current && activeDownload.current === operation
+    setDownload({ id: artifact.id, percent: 0, saving: false, error: null, saved: null })
     try {
       const saved = await downloadActionsArtifact(
         {
-          repoId: option.repo.id,
-          repoPath: option.repo.path,
-          ownerKey: actionsRepoProbeKey(option.repo)
+          repoId,
+          repoPath,
+          ownerKey
         },
-        { repository: option.repository, runId, artifactId: artifact.id },
+        { repository: { owner, repo: repoName, host }, runId, artifactId: artifact.id },
         artifact.name,
-        () => alive.current && !canceled.current,
+        () => currentDownload() && !operation.canceled,
         (percent) => {
-          if (alive.current) {
+          if (currentDownload()) {
             setDownload((d) => ({ ...d, percent }))
+          }
+        },
+        () => {
+          operation.saving = true
+          if (currentDownload()) {
+            setDownload((d) => ({ ...d, saving: true }))
           }
         }
       )
-      if (alive.current) {
-        setDownload({ id: null, percent: 100, error: null, saved })
+      if (currentDownload()) {
+        setDownload({ id: null, percent: 100, saving: false, error: null, saved })
       }
     } catch (error) {
-      if (alive.current) {
-        if (canceled.current) {
-          setDownload({ id: null, percent: 0, saved: null, error: null })
-          return
-        }
+      if (currentDownload()) {
         setDownload({
           id: null,
           percent: 0,
+          saving: false,
           saved: null,
-          error: error instanceof Error ? error.message : String(error)
+          error: operation.canceled ? null : error instanceof Error ? error.message : String(error)
         })
+      }
+    } finally {
+      if (activeDownload.current === operation) {
+        activeDownload.current = null
       }
     }
   }
   return {
     ...state,
     download,
+    supportsDownload: !isWebClientLocation(),
     /** Replace the artifact list with a fresh first page while preserving download state. */
     refresh: () => {
       void read()
@@ -125,7 +147,10 @@ export function useActionsArtifacts(option: ActionsRepositoryOption, runId: numb
     save,
     /** Mark the current save for cancellation at its next transfer boundary without raising an error alert. */
     cancel: () => {
-      canceled.current = true
+      const operation = activeDownload.current
+      if (operation && !operation.saving) {
+        operation.canceled = true
+      }
     }
   }
 }

@@ -173,3 +173,68 @@ it('cleans partial disk bytes and releases remote transfer after a chunk network
   expect(filesystem.downloadSessions.size).toBe(0)
   expect(requests.releaseActionsArtifactDownload).toHaveBeenCalledOnce()
 })
+
+it('cancellation at the last chunk still preserves the destination before finalization', async () => {
+  const existing = Buffer.from('existing destination')
+  await writeFile(destination, existing)
+  let live = true
+  const saving = vi.fn()
+  await expect(
+    downloadActionsArtifact(
+      context,
+      query,
+      'hello',
+      () => live,
+      (percent) => {
+        if (percent === 100) {
+          live = false
+        }
+      },
+      saving
+    )
+  ).rejects.toThrow('Artifact download canceled')
+  expect(saving).not.toHaveBeenCalled()
+  expect(await readFile(destination)).toEqual(existing)
+  expect(await readdir(directory)).toEqual(['hello.zip'])
+  expect(filesystem.downloadSessions.size).toBe(0)
+})
+
+it('finalization owns real staging despite late cancel or navigation and never deletes the committed file', async () => {
+  const existing = Buffer.from('existing destination')
+  await writeFile(destination, existing)
+  const started = await window.api.fs.startDownloadedFile({ suggestedName: 'hello.zip' })
+  if (started.canceled) {
+    throw new Error('Fixture download canceled')
+  }
+  await window.api.fs.appendDownloadedFileChunk({
+    transferId: started.transferId,
+    contentBase64: archive.toString('base64')
+  })
+  const session = filesystem.downloadSessions.get(started.transferId)
+  if (!session) {
+    throw new Error('Fixture session missing')
+  }
+  const held = Promise.withResolvers<void>()
+  const close = session.handle.close.bind(session.handle)
+  const closing = vi.spyOn(session.handle, 'close').mockImplementation(async () => {
+    await held.promise
+    return close()
+  })
+  const finishing = window.api.fs.finishDownloadedFile({ transferId: started.transferId })
+  try {
+    expect(closing).toHaveBeenCalledOnce()
+    await window.api.fs.cancelDownloadedFile({ transferId: started.transferId })
+    sender.emit('did-navigate')
+    expect(await readFile(destination)).toEqual(existing)
+    held.resolve()
+    await expect(finishing).resolves.toEqual({ canceled: false, destinationPath: destination })
+    await window.api.fs.cancelDownloadedFile({ transferId: started.transferId })
+    expect(await readFile(destination)).toEqual(archive)
+    expect(await readdir(directory)).toEqual(['hello.zip'])
+    expect(filesystem.downloadSessions.size).toBe(0)
+  } finally {
+    held.resolve()
+    await finishing.catch(() => {})
+    closing.mockRestore()
+  }
+})

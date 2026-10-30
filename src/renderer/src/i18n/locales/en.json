@@ -22395,7 +22395,9 @@
       "saving": "Downloading ZIP…",
       "cancel": "Cancel download",
       "saved": "Saved ZIP to {{path}}",
-      "invalidChunk": "Invalid artifact download chunk"
+      "invalidChunk": "Invalid artifact download chunk",
+      "desktopRequired": "Download ZIP is available in the desktop app. Use Open run on GitHub to download.",
+      "finalizing": "Saving ZIP…"
     }
   },
   "checkRun": {

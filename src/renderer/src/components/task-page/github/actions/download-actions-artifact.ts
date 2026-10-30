@@ -13,7 +13,8 @@ export async function downloadActionsArtifact(
   query: ActionsArtifactDownloadQuery,
   name: string,
   live: () => boolean,
-  progress: (percent: number) => void
+  progress: (percent: number) => void,
+  onSaving?: () => void
 ): Promise<string | null> {
   const local = await window.api.fs.startDownloadedFile({ suggestedName: `${name}.zip` })
   if (local.canceled) {
@@ -51,6 +52,8 @@ export async function downloadActionsArtifact(
     if (!live()) {
       throw new Error('Artifact download canceled')
     }
+    // Finalization takes ownership of the staging file; cancellation ends before this IPC.
+    onSaving?.()
     const result = await window.api.fs.finishDownloadedFile({ transferId: local.transferId })
     finished = true
     return result.destinationPath

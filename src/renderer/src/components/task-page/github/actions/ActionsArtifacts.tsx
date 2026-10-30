@@ -61,6 +61,14 @@ export function ActionsArtifacts({
             {translate('actions.artifacts.empty', 'No artifacts are available for this run.')}
           </p>
         )}
+        {!model.supportsDownload && (
+          <p className="text-sm text-muted-foreground">
+            {translate(
+              'actions.artifacts.desktopRequired',
+              'Download ZIP is available in the desktop app. Use Open run on GitHub to download.'
+            )}
+          </p>
+        )}
         {model.data?.items.map((artifact) => {
           const expired = artifact.expired
           const tooLarge = artifact.sizeBytes > ACTIONS_ARTIFACT_MAX_BYTES
@@ -92,7 +100,9 @@ export function ActionsArtifacts({
               <Button
                 variant="outline"
                 size="sm"
-                disabled={expired || tooLarge || model.download.id !== null}
+                disabled={
+                  !model.supportsDownload || expired || tooLarge || model.download.id !== null
+                }
                 aria-label={translate('actions.artifacts.downloadName', 'Download {{name}}', {
                   name: artifact.name
                 })}
@@ -102,7 +112,9 @@ export function ActionsArtifacts({
               >
                 <Download className="size-4" />
                 {model.download.id === artifact.id
-                  ? `${model.download.percent}%`
+                  ? model.download.saving
+                    ? translate('actions.artifacts.finalizing', 'Saving ZIP…')
+                    : `${model.download.percent}%`
                   : translate('actions.artifacts.download', 'Download ZIP')}
               </Button>
             </div>
@@ -124,9 +136,16 @@ export function ActionsArtifacts({
         {model.download.id !== null && (
           <div className="flex items-center gap-3">
             <p role="status" className="text-xs text-muted-foreground">
-              {translate('actions.artifacts.saving', 'Downloading ZIP…')} {model.download.percent}%
+              {model.download.saving
+                ? translate('actions.artifacts.finalizing', 'Saving ZIP…')
+                : `${translate('actions.artifacts.saving', 'Downloading ZIP…')} ${model.download.percent}%`}
             </p>
-            <Button variant="outline" size="sm" onClick={model.cancel}>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={model.download.saving}
+              onClick={model.cancel}
+            >
               {translate('actions.artifacts.cancel', 'Cancel download')}
             </Button>
           </div>

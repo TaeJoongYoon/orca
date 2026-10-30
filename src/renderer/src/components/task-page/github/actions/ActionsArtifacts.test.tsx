@@ -189,3 +189,117 @@ it('localizes invalid chunks and cleans up both transfers', async () => {
   expect(requests.releaseActionsArtifactDownload).toHaveBeenCalled()
   expect(finish).not.toHaveBeenCalled()
 })
+
+it('disables unsupported paired-web downloads and explains the available path', async () => {
+  vi.stubGlobal('__ORCA_WEB_CLIENT__', true)
+  try {
+    mount()
+    const button = await ready()
+    expect(button.hasAttribute('disabled')).toBe(true)
+    expect(
+      screen.getByText(
+        'Download ZIP is available in the desktop app. Use Open run on GitHub to download.'
+      )
+    ).toBeTruthy()
+    fireEvent.click(button)
+    expect(start).not.toHaveBeenCalled()
+    expect(requests.startActionsArtifactDownload).not.toHaveBeenCalled()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+it('makes final saving non-cancelable and reports the actual committed result', async () => {
+  const held = Promise.withResolvers<Awaited<ReturnType<typeof finish>>>()
+  finish.mockReturnValueOnce(held.promise)
+  mount()
+  fireEvent.click(await ready())
+  await waitFor(() => expect(finish).toHaveBeenCalledOnce())
+  const cancelButton = screen.getByRole('button', { name: 'Cancel download' })
+  expect(cancelButton.hasAttribute('disabled')).toBe(true)
+  expect(screen.getByRole('status').textContent).toBe('Saving ZIP…')
+  fireEvent.click(cancelButton)
+  fireEvent.click(cancelButton)
+  await act(async () => held.resolve({ canceled: false, destinationPath: '/tmp/test-report.zip' }))
+  expect(await screen.findByText('Saved ZIP to /tmp/test-report.zip')).toBeTruthy()
+  expect(cancel).not.toHaveBeenCalled()
+  expect(requests.releaseActionsArtifactDownload).toHaveBeenCalledOnce()
+})
+
+it('admits only one save when download is clicked repeatedly before React renders', async () => {
+  const held = Promise.withResolvers<Awaited<ReturnType<typeof start>>>()
+  start.mockReturnValueOnce(held.promise)
+  mount()
+  const button = await ready()
+  act(() => {
+    button.click()
+    button.click()
+  })
+  expect(start).toHaveBeenCalledOnce()
+  await act(async () => held.resolve({ canceled: true }))
+  expect(requests.startActionsArtifactDownload).not.toHaveBeenCalled()
+})
+
+it('keeps an old finalization from overwriting a new run’s pending save', async () => {
+  const first = Promise.withResolvers<Awaited<ReturnType<typeof finish>>>()
+  const second = Promise.withResolvers<Awaited<ReturnType<typeof finish>>>()
+  finish.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+  start
+    .mockResolvedValueOnce({
+      canceled: false,
+      transferId: 'first',
+      destinationPath: '/tmp/first.zip'
+    })
+    .mockResolvedValueOnce({
+      canceled: false,
+      transferId: 'second',
+      destinationPath: '/tmp/second.zip'
+    })
+  const view = mount()
+  fireEvent.click(await ready())
+  await waitFor(() => expect(finish).toHaveBeenCalledTimes(1))
+  view.rerender(<ActionsArtifacts option={option} runId={901} />)
+  fireEvent.click(await ready())
+  await waitFor(() => expect(finish).toHaveBeenCalledTimes(2))
+  await act(async () => first.resolve({ canceled: false, destinationPath: '/tmp/first.zip' }))
+  expect(screen.queryByText('Saved ZIP to /tmp/first.zip')).toBeNull()
+  expect((await ready()).hasAttribute('disabled')).toBe(true)
+  await act(async () => second.resolve({ canceled: false, destinationPath: '/tmp/second.zip' }))
+  expect(await screen.findByText('Saved ZIP to /tmp/second.zip')).toBeTruthy()
+  expect(cancel).not.toHaveBeenCalled()
+})
+
+it('releases both transfers after navigating away during acquisition', async () => {
+  const held =
+    Promise.withResolvers<Awaited<ReturnType<typeof requests.startActionsArtifactDownload>>>()
+  vi.mocked(requests.startActionsArtifactDownload).mockReturnValueOnce(held.promise)
+  const view = mount()
+  fireEvent.click(await ready())
+  await waitFor(() => expect(requests.startActionsArtifactDownload).toHaveBeenCalledOnce())
+  view.unmount()
+  await act(async () =>
+    held.resolve({ transferId: 'remote', sizeBytes: 4, fileName: 'test-report.zip' })
+  )
+  expect(requests.releaseActionsArtifactDownload).toHaveBeenCalledOnce()
+  expect(cancel).toHaveBeenCalledWith({ transferId: 'local' })
+  expect(finish).not.toHaveBeenCalled()
+})
+
+it('keeps the same save when the parent recreates equivalent repository options', async () => {
+  const held = Promise.withResolvers<Awaited<ReturnType<typeof finish>>>()
+  finish.mockReturnValueOnce(held.promise)
+  const view = mount()
+  fireEvent.click(await ready())
+  await waitFor(() => expect(finish).toHaveBeenCalledOnce())
+  view.rerender(
+    <ActionsArtifacts
+      option={{ repo: { ...TEST_REPO }, repository: { ...repository } }}
+      runId={900}
+    />
+  )
+  expect(screen.getByRole('button', { name: 'Cancel download' }).hasAttribute('disabled')).toBe(
+    true
+  )
+  await act(async () => held.resolve({ canceled: false, destinationPath: '/tmp/test-report.zip' }))
+  expect(await screen.findByText('Saved ZIP to /tmp/test-report.zip')).toBeTruthy()
+})
