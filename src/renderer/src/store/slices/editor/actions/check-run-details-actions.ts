@@ -33,6 +33,7 @@ export function createCheckRunDetailsActions(
       const id = buildCheckRunDetailsTabId(worktreeId, check)
       const label = getCheckRunDetailsTabLabel(check)
       const checkRunDetails: OpenCheckRunDetailsState = {
+        actionsAttempt: state.actionsAttempt,
         actionsContext: state.actionsContext,
         contextKey,
         check,
@@ -137,6 +138,8 @@ export function createCheckRunDetailsActions(
         const githubRepository = state.githubRepository ?? current.githubRepository ?? null
         const gitlabProjectRef = state.gitlabProjectRef ?? current.gitlabProjectRef ?? null
         const nextCheckRunDetails: OpenCheckRunDetailsState = {
+          actionsAttempt:
+            state.actionsAttempt === undefined ? current.actionsAttempt : state.actionsAttempt,
           actionsContext: state.actionsContext ?? current.actionsContext,
           contextKey,
           check,
@@ -148,6 +151,7 @@ export function createCheckRunDetailsActions(
           gitlabProjectRef
         }
         if (
+          current.actionsAttempt === nextCheckRunDetails.actionsAttempt &&
           current.contextKey === nextCheckRunDetails.contextKey &&
           current.requestId === nextCheckRunDetails.requestId &&
           current.check.status === nextCheckRunDetails.check.status &&

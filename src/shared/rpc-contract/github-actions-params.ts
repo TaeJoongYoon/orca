@@ -17,6 +17,7 @@ export const ActionsDetailsQuery = z.object({
   repository: SlugRepo,
   runId: z.number().int().positive(),
   jobsPage: z.number().int().min(1).max(10).optional(),
+  attempt: z.number().int().positive().optional(),
   expectedAttempt: z.number().int().positive().optional(),
   noCache: z.boolean().optional()
 })

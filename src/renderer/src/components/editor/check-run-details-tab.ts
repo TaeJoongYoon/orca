@@ -12,6 +12,7 @@ export type CheckRunDetailsTabPatch = Pick<
   | 'githubRepository'
   | 'gitlabProjectRef'
   | 'actionsContext'
+  | 'actionsAttempt'
 >
 
 let nextCheckRunDetailsRequestId = 0

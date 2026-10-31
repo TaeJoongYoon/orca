@@ -159,3 +159,55 @@ describe('whole-run presentation', () => {
     expect(html).not.toContain('No jobs are available')
   })
 })
+
+it('shows only explicit PR and commit links rather than constructing one from the run SHA', () => {
+  if (!details.actions) {
+    throw new Error('Missing Actions fixture')
+  }
+  const withSha = {
+    ...details,
+    actions: { ...details.actions, run: { ...details.actions.run, headSha: 'a'.repeat(40) } }
+  }
+  expect(markup(withSha)).not.toContain('Open commit')
+  const html = markup({
+    ...withSha,
+    actions: {
+      ...withSha.actions,
+      commitUrl: 'https://github.com/acme/repo/commit/real',
+      pullRequests: [
+        { number: 42, url: 'https://github.com/acme/repo/pull/42' },
+        { number: 99, url: 'javascript:alert(1)' }
+      ]
+    }
+  })
+  expect(html).toContain('Open commit')
+  expect(html).toContain('Open PR #42')
+  expect(html).not.toContain('Open PR #99')
+})
+
+it('displays provided runner labels alongside job and step state', () => {
+  const html = markup({
+    ...details,
+    jobs: [
+      {
+        ...details.jobs[0],
+        conclusion: null,
+        status: 'in_progress',
+        runnerName: 'runner-one',
+        runnerLabels: ['self-hosted', 'linux'],
+        steps: [
+          {
+            name: 'Compile code',
+            status: 'in_progress',
+            conclusion: null,
+            startedAt: null,
+            completedAt: null
+          }
+        ]
+      }
+    ]
+  })
+  expect(html).toContain('runner-one · self-hosted · linux')
+  expect(html).toContain('Compile code')
+  expect(html).toContain('In progress')
+})

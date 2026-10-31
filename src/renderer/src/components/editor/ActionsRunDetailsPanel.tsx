@@ -1,3 +1,4 @@
+import { ActionsRunAttemptPicker } from './ActionsRunAttemptPicker'
 import type { ReactNode } from 'react'
 import { actionsDurationSeconds } from '../../../../shared/github/actions-duration'
 import { formatNativeChatDuration } from '../../../../shared/native-chat-turn-status'
@@ -17,6 +18,9 @@ export function ActionsRunDetailsPanel({ file }: { file: OpenFile }): React.JSX.
   return (
     <ActionsRunDetailsContent
       state={file.checkRunDetails}
+      onAttemptChange={(attempt) => {
+        void loadActionsDetailTab(useAppStore.getState, file.id, false, attempt)
+      }}
       refresh={() => {
         void loadActionsDetailTab(useAppStore.getState, file.id)
       }}
@@ -33,13 +37,15 @@ export function ActionsRunDetailsContent({
   refresh,
   loadMore,
   onBack,
-  artifacts
+  artifacts,
+  onAttemptChange
 }: {
   state: OpenFile['checkRunDetails']
   refresh: () => void
   loadMore: () => void
   onBack?: () => void
   artifacts?: ReactNode
+  onAttemptChange?: (attempt: number | null) => void
 }): React.JSX.Element {
   const details = state?.details
   const showLoading = useDelayedStatus(state?.contextKey ?? '', state?.loading ? true : null, 150)
@@ -70,6 +76,14 @@ export function ActionsRunDetailsContent({
             {translate('actions.refresh', 'Refresh')}
           </Button>
         </div>
+        {onAttemptChange && state && (
+          <ActionsRunAttemptPicker
+            owner={state.contextKey}
+            selected={state.actionsAttempt ?? null}
+            latest={metadata?.latestAttempt ?? run?.runAttempt}
+            onChange={onAttemptChange}
+          />
+        )}
         {run && (
           <div className="mt-2 grid gap-1 text-xs text-muted-foreground">
             <span>
@@ -114,6 +128,14 @@ export function ActionsRunDetailsContent({
             </Button>
           </div>
         )}
+        {metadata?.relatedLinksUnavailable && (
+          <p className="text-xs text-muted-foreground">
+            {translate(
+              'actions.relatedLinksUnavailable',
+              'Some related links could not be loaded. Open the run on GitHub for more.'
+            )}
+          </p>
+        )}
         {metadata?.logWarnings.length ? (
           <p className="text-xs text-muted-foreground">
             {translate(
@@ -157,19 +179,20 @@ export function ActionsRunDetailsContent({
           <Button variant="outline" size="sm" onClick={() => open(run?.htmlUrl ?? null)}>
             {translate('actions.openRun', 'Open run on GitHub')}
           </Button>
-          {run?.headSha && (
-            <Button
-              variant="link"
-              size="sm"
-              onClick={() =>
-                open(
-                  `${actionsRepositoryUrl(metadata.repository)}/commit/${encodeURIComponent(run.headSha!)}`
-                )
-              }
-            >
+          {actionsUrl(metadata.commitUrl) && (
+            <Button variant="link" size="sm" onClick={() => open(metadata.commitUrl ?? null)}>
               {translate('actions.openCommit', 'Open commit')}
             </Button>
           )}
+          {metadata.pullRequests
+            ?.filter((pull) => actionsUrl(pull.url))
+            .map((pull) => (
+              <Button key={pull.url} variant="link" size="sm" onClick={() => open(pull.url)}>
+                {translate('actions.openPullRequest', 'Open PR #{{number}}', {
+                  number: pull.number
+                })}
+              </Button>
+            ))}
           {workflowFile && (
             <Button
               variant="link"

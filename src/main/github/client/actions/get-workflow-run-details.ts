@@ -1,3 +1,4 @@
+import { readActionsRelatedLinks } from './actions-related-links'
 import type {
   ActionsDetailsQuery,
   ActionsRunDetails
@@ -10,7 +11,7 @@ import { mapWorkflowJobs } from '../check/check-detail-field-mapping'
 import { attachFailedJobLogTails } from '../check/check-job-log-tails'
 import { rethrowCheckDetailsAbort } from '../check/check-details-abort'
 
-/** Read the latest attempt’s jobs and bounded log excerpts; preserve run metadata when job reads fail. */
+/** Read a selected or latest attempt’s jobs and bounded log excerpts; preserve run metadata when job reads fail. */
 export function getWorkflowRunDetails(
   repoPath: string,
   query: ActionsDetailsQuery,
@@ -27,9 +28,20 @@ export function getWorkflowRunDetails(
     signal,
     async (repository, options, context) => {
       const base = `repos/${repository.owner}/${repository.repo}/actions/runs/${args.runId}`
-      const run = mapActionsRun(await actionsJson(base, options))
-      if (run.id !== args.runId) {
+      const latestRaw = actionsRecord(await actionsJson(base, options))
+      const latest = mapActionsRun(latestRaw)
+      if (latest.id !== args.runId) {
         throw new Error('GitHub returned a different workflow run')
+      }
+      if (args.attempt && args.attempt > latest.runAttempt) {
+        throw new Error('Workflow run attempt is not available')
+      }
+      const selectedRaw = args.attempt
+        ? actionsRecord(await actionsJson(`${base}/attempts/${args.attempt}`, options))
+        : latestRaw
+      const run = mapActionsRun(selectedRaw)
+      if (run.id !== args.runId || (args.attempt && run.runAttempt !== args.attempt)) {
+        throw new Error('GitHub returned a different workflow run attempt')
       }
       const jobsPage =
         args.expectedAttempt && args.expectedAttempt !== run.runAttempt ? 1 : (args.jobsPage ?? 1)
@@ -37,24 +49,32 @@ export function getWorkflowRunDetails(
       let totalJobs: number | null = null
       let jobsError: string | null = null
       const logWarnings: string[] = []
-      try {
-        const raw = actionsRecord(
-          await actionsJson(
-            `${base}/attempts/${run.runAttempt}/jobs?per_page=100&page=${jobsPage}`,
-            options
+      const loadJobs = async (): Promise<void> => {
+        try {
+          const raw = actionsRecord(
+            await actionsJson(
+              `${base}/attempts/${run.runAttempt}/jobs?per_page=100&page=${jobsPage}`,
+              options
+            )
           )
-        )
-        if (!Array.isArray(raw.jobs)) {
-          throw new Error('Invalid GitHub Actions jobs page')
+          if (!Array.isArray(raw.jobs)) {
+            throw new Error('Invalid GitHub Actions jobs page')
+          }
+          jobs = mapWorkflowJobs({ ...raw, jobs: raw.jobs.map(actionsRecord) })
+          totalJobs = actionsCount(raw.total_count)
+          await attachFailedJobLogTails(jobs, repository, options, context)
+          logWarnings.push(...jobs.filter((job) => job.logState === 'error').map((job) => job.name))
+        } catch (error) {
+          rethrowCheckDetailsAbort(options.signal, error)
+          jobsError = error instanceof Error ? error.message : String(error)
         }
-        jobs = mapWorkflowJobs({ ...raw, jobs: raw.jobs.map(actionsRecord) })
-        totalJobs = actionsCount(raw.total_count)
-        await attachFailedJobLogTails(jobs, repository, options, context)
-        logWarnings.push(...jobs.filter((job) => job.logState === 'error').map((job) => job.name))
-      } catch (error) {
-        rethrowCheckDetailsAbort(options.signal, error)
-        jobsError = error instanceof Error ? error.message : String(error)
       }
+      const [links] = await Promise.all([
+        jobsPage === 1
+          ? readActionsRelatedLinks(selectedRaw, run, repository, options)
+          : Promise.resolve({}),
+        loadJobs()
+      ])
       const more =
         !jobsError && (totalJobs === null ? jobs.length === 100 : jobsPage * 100 < totalJobs)
       return {
@@ -73,6 +93,8 @@ export function getWorkflowRunDetails(
         actions: {
           repository,
           run,
+          latestAttempt: latest.runAttempt,
+          ...links,
           jobsPage,
           totalJobs,
           jobsError,

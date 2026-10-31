@@ -74,6 +74,7 @@ export type CombinedDiffSkippedConflict = {
 }
 
 export type OpenCheckRunDetailsState = {
+  actionsAttempt?: number | null
   actionsContext?: ActionsRequestContext
   contextKey: string
   check: PRCheckDetail

@@ -69,12 +69,17 @@ export type ActionsDetailsQuery = {
   repository: GitHubRepositoryIdentity
   runId: number
   jobsPage?: number
+  attempt?: number
   expectedAttempt?: number
   noCache?: boolean
 }
 export type ActionsDetailMetadata = {
   repository: GitHubRepositoryIdentity
   run: ActionsRun
+  latestAttempt?: number
+  commitUrl?: string | null
+  pullRequests?: { number: number; url: string }[]
+  relatedLinksUnavailable?: boolean
   jobsPage: number
   hasNextPage: boolean
   limitReached: boolean

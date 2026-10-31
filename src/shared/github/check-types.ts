@@ -40,6 +40,8 @@ export type PRCheckStep = {
 }
 
 export type PRCheckJob = {
+  runnerName?: string | null
+  runnerLabels?: string[]
   id: number | null
   name: string
   status: string | null

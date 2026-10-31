@@ -202,6 +202,13 @@ function JobCard({
         )}
       </div>
 
+      {actionsStatusColors && (job.runnerName || job.runnerLabels?.length) ? (
+        <p className="mt-1 break-words text-xs text-muted-foreground">
+          {translate('actions.runner', 'Runner')}:{' '}
+          {[job.runnerName, ...(job.runnerLabels ?? [])].filter(Boolean).join(' · ')}
+        </p>
+      ) : null}
+
       {breakdown.failed.length > 0 && (
         <div className="mt-2 grid gap-0.5">
           {breakdown.failed.map((step) => (

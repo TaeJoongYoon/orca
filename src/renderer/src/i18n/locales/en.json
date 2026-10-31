@@ -23024,8 +23024,16 @@
       "saved": "Saved ZIP to {{path}}",
       "invalidChunk": "Invalid artifact download chunk",
       "desktopRequired": "Download ZIP is available in the desktop app. Use Open run on GitHub to download.",
-      "finalizing": "Saving ZIP…"
-    }
+      "finalizing": "Saving ZIP…",
+      "runScope": "Run artifacts are not filtered by attempt."
+    },
+    "viewAttempt": "View attempt",
+    "latestAttempt": "Latest attempt",
+    "latestAttemptNumber": "Latest: {{attempt}}",
+    "relatedLinksUnavailable": "Some related links could not be loaded. Open the run on GitHub for more.",
+    "openPullRequest": "Open PR #{{number}}",
+    "runner": "Runner",
+    "attemptUnsupported": "The host did not return the selected attempt. Update the host and retry."
   },
   "checkRun": {
     "openJob": "Open job"

@@ -58,7 +58,8 @@ export function openActionsRun(
 export async function loadActionsDetailTab(
   get: () => AppState,
   fileId: string,
-  append = false
+  append = false,
+  attempt?: number | null
 ): Promise<void> {
   const state = get()
   const file = state.openFiles.find((entry) => entry.id === fileId)
@@ -71,7 +72,11 @@ export async function loadActionsDetailTab(
   ) {
     return
   }
-  const prior = current.details?.actions ? current.details : null
+  const selectedAttempt = attempt === undefined ? (current.actionsAttempt ?? null) : attempt
+  const prior =
+    current.details?.actions && selectedAttempt === (current.actionsAttempt ?? null)
+      ? current.details
+      : null
   if (append && (!prior?.actions?.hasNextPage || current.loading)) {
     return
   }
@@ -86,7 +91,8 @@ export async function loadActionsDetailTab(
       details,
       loading,
       error,
-      requestId
+      requestId,
+      actionsAttempt: selectedAttempt
     })
   }
   // Why: a refreshed generation owns pagination; a slower page cannot append into it.
@@ -96,10 +102,19 @@ export async function loadActionsDetailTab(
     const next = await fetchActionsRunDetails(get(), current.actionsContext, {
       repository: current.githubRepository,
       runId: current.check.workflowRunId,
+      attempt: selectedAttempt ?? undefined,
       jobsPage: append && prior?.actions ? prior.actions.jobsPage + 1 : 1,
       expectedAttempt: append ? prior?.actions?.run.runAttempt : undefined,
       noCache: !append
     })
+    if (selectedAttempt !== null && next.actions.run.runAttempt !== selectedAttempt) {
+      throw new Error(
+        translate(
+          'actions.attemptUnsupported',
+          'The host did not return the selected attempt. Update the host and retry.'
+        )
+      )
+    }
     const latestRepo = get().repos.find((entry) => entry.id === current.actionsContext?.repoId)
     if (
       !latestRepo ||
@@ -130,6 +145,7 @@ export async function loadActionsDetailTab(
             ...next,
             jobs: [...prior.jobs, ...next.jobs],
             actions: {
+              ...prior.actions,
               ...next.actions,
               logWarnings: [...prior.actions.logWarnings, ...next.actions.logWarnings]
             }

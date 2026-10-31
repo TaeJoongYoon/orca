@@ -178,3 +178,75 @@ describe('whole-run editor state', () => {
     expect(store.getState().openFiles[0].checkRunDetails?.details?.jobs).toHaveLength(1)
   })
 })
+
+describe('selected attempt ownership', () => {
+  it('keeps an explicit attempt through pagination and refresh, and returns to latest only explicitly', async () => {
+    const { store, fileId } = setup()
+    const read = vi
+      .fn()
+      .mockResolvedValueOnce(details(1, 2))
+      .mockResolvedValueOnce(details(2, 2))
+      .mockResolvedValueOnce(details(1, 2))
+      .mockResolvedValueOnce(details(1, 3))
+    vi.stubGlobal('window', { api: { gh: { actionsRunDetails: read } } })
+    await loadActionsDetailTab(store.getState, fileId, false, 2)
+    await loadActionsDetailTab(store.getState, fileId, true)
+    expect(store.getState().openFiles[0].checkRunDetails?.details?.jobs).toHaveLength(2)
+    await loadActionsDetailTab(store.getState, fileId)
+    expect(read.mock.calls[2][0]).toMatchObject({ attempt: 2, jobsPage: 1 })
+    await loadActionsDetailTab(store.getState, fileId, false, null)
+    expect(read.mock.calls[3][0].attempt).toBeUndefined()
+    expect(store.getState().openFiles[0].checkRunDetails?.actionsAttempt).toBeNull()
+    expect(store.getState().openFiles[0].checkRunDetails?.details?.actions?.run.runAttempt).toBe(3)
+  })
+
+  it('refuses a legacy host that silently returns latest instead of the selection', async () => {
+    const { store, fileId } = setup()
+    const read = vi.fn().mockResolvedValue(details(1, 3))
+    vi.stubGlobal('window', { api: { gh: { actionsRunDetails: read } } })
+    await loadActionsDetailTab(store.getState, fileId, false, 2)
+    const current = store.getState().openFiles[0].checkRunDetails
+    expect(current?.actionsAttempt).toBe(2)
+    expect(current?.details).toBeNull()
+    expect(current?.error).toContain('did not return the selected attempt')
+  })
+
+  it('ignores a late failed selection after a newer selection succeeds', async () => {
+    const { store, fileId } = setup()
+    const held = Promise.withResolvers<ActionsRunDetails>()
+    const read = vi.fn().mockReturnValueOnce(held.promise).mockResolvedValueOnce(details(1, 3))
+    vi.stubGlobal('window', { api: { gh: { actionsRunDetails: read } } })
+    const old = loadActionsDetailTab(store.getState, fileId, false, 2)
+    await loadActionsDetailTab(store.getState, fileId, false, 3)
+    held.reject(new Error('Old permission failure'))
+    await old
+    expect(store.getState().openFiles[0].checkRunDetails?.actionsAttempt).toBe(3)
+    expect(store.getState().openFiles[0].checkRunDetails?.error).toBeNull()
+  })
+})
+
+it('does not overwrite a closed and reopened tab with the old attempt response', async () => {
+  const { store, fileId } = setup()
+  const file = store.getState().openFiles[0]
+  const current = file.checkRunDetails
+  if (!current) {
+    throw new Error('Missing fixture state')
+  }
+  const held = Promise.withResolvers<ActionsRunDetails>()
+  const read = vi.fn().mockReturnValueOnce(held.promise).mockResolvedValueOnce(details(1, 3))
+  vi.stubGlobal('window', { api: { gh: { actionsRunDetails: read } } })
+  const old = loadActionsDetailTab(store.getState, fileId, false, 2)
+  store.getState().closeFile(fileId)
+  store.getState().openCheckRunDetails(file.worktreeId, current.contextKey, current.check, {
+    actionsContext: current.actionsContext,
+    githubRepository: repository,
+    details: null,
+    loading: false,
+    error: null
+  })
+  await loadActionsDetailTab(store.getState, fileId, false, 3)
+  held.resolve(details(1, 2))
+  await old
+  expect(store.getState().openFiles[0].checkRunDetails?.actionsAttempt).toBe(3)
+  expect(store.getState().openFiles[0].checkRunDetails?.details?.actions?.run.runAttempt).toBe(3)
+})
